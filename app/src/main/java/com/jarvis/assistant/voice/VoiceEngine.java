@@ -3,6 +3,8 @@ package com.jarvis.assistant.voice;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -20,8 +22,10 @@ public class VoiceEngine {
 
     private final Context context;
     private final Listener listener;
+
     private SpeechRecognizer recognizer;
     private boolean running = false;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     public VoiceEngine(Context context, Listener listener) {
         this.context = context;
@@ -35,11 +39,10 @@ public class VoiceEngine {
             return;
         }
 
-        if (recognizer != null) {
-            recognizer.destroy();
-        }
+        stopRecognizerOnly();
 
         recognizer = SpeechRecognizer.createSpeechRecognizer(context);
+
         recognizer.setRecognitionListener(new RecognitionListener() {
 
             @Override
@@ -67,8 +70,6 @@ public class VoiceEngine {
             public void onError(int error) {
                 if (running) {
                     restartListening();
-                } else {
-                    listener.onError("Voice recognition error: " + error);
                 }
             }
 
@@ -81,6 +82,7 @@ public class VoiceEngine {
                         );
 
                 if (matches != null && !matches.isEmpty()) {
+
                     String text = matches.get(0).trim();
 
                     if (!text.isEmpty()) {
@@ -88,6 +90,8 @@ public class VoiceEngine {
                     }
                 }
 
+                // Result ke turant baad restart nahi karna.
+                // Thoda delay rakhenge.
                 if (running) {
                     restartListening();
                 }
@@ -112,55 +116,78 @@ public class VoiceEngine {
             return;
         }
 
-        Intent intent = new Intent(
-                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-        );
+        try {
 
-        intent.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-        );
+            Intent intent = new Intent(
+                    RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+            );
 
-        intent.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                Locale.getDefault()
-        );
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            );
 
-        intent.putExtra(
-                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                true
-        );
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE,
+                    Locale.getDefault()
+            );
 
-        intent.putExtra(
-                RecognizerIntent.EXTRA_MAX_RESULTS,
-                3
-        );
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                    false
+            );
 
-        recognizer.startListening(intent);
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_MAX_RESULTS,
+                    3
+            );
+
+            recognizer.startListening(intent);
+
+        } catch (Exception e) {
+            listener.onError("Voice start nahi ho payi.");
+        }
     }
 
     private void restartListening() {
 
-        new android.os.Handler(
-                android.os.Looper.getMainLooper()
-        ).postDelayed(() -> {
+        handler.postDelayed(() -> {
 
-            if (running) {
+            if (running && recognizer != null) {
                 startRecognition();
             }
 
-        }, 300);
+        }, 1000);
+    }
+
+    private void stopRecognizerOnly() {
+
+        if (recognizer != null) {
+            try {
+                recognizer.stopListening();
+            } catch (Exception ignored) {
+            }
+
+            try {
+                recognizer.cancel();
+            } catch (Exception ignored) {
+            }
+
+            try {
+                recognizer.destroy();
+            } catch (Exception ignored) {
+            }
+
+            recognizer = null;
+        }
     }
 
     public void stop() {
 
         running = false;
 
-        if (recognizer != null) {
-            recognizer.stopListening();
-            recognizer.cancel();
-            recognizer.destroy();
-            recognizer = null;
-        }
+        handler.removeCallbacksAndMessages(null);
+
+        stopRecognizerOnly();
     }
 }
