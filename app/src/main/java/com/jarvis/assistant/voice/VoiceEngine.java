@@ -28,7 +28,6 @@ public class VoiceEngine {
 
     private boolean running = false;
     private boolean speaking = false;
-    private boolean restarting = false;
 
     public VoiceEngine(Context context, Listener listener) {
         this.context = context;
@@ -38,132 +37,116 @@ public class VoiceEngine {
     public void start() {
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            listener.onError("Speech recognition available nahi hai.");
+            listener.onError("Speech recognition service available nahi hai.");
             return;
         }
 
         running = true;
-        speaking = false;
-
-        startNewRecognition();
+        startRecognition();
     }
 
-    private void startNewRecognition() {
+    private void startRecognition() {
 
-        if (!running || speaking || restarting) {
+        if (!running || speaking) {
             return;
         }
-
-        restarting = true;
-
-        handler.postDelayed(() -> {
-
-            restarting = false;
-
-            if (!running || speaking) {
-                return;
-            }
-
-            createRecognizer();
-            beginListening();
-
-        }, 300);
-    }
-
-    private void createRecognizer() {
 
         destroyRecognizer();
 
-        recognizer = SpeechRecognizer.createSpeechRecognizer(context);
-
-        recognizer.setRecognitionListener(new RecognitionListener() {
-
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-
-                if (running && !speaking) {
-                    listener.onListening();
-                }
-            }
-
-            @Override
-            public void onBeginningOfSpeech() {
-                // User ne bolna start kar diya.
-            }
-
-            @Override
-            public void onRmsChanged(float rmsdB) {
-                // Voice level available hai.
-            }
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {
-            }
-
-            @Override
-            public void onEndOfSpeech() {
-                // User ruk gaya.
-                // Android result process karega.
-            }
-
-            @Override
-            public void onError(int error) {
-
-                if (!running || speaking) {
-                    return;
-                }
-
-                // Temporary recognition errors ko automatically recover karo.
-                restartListening(500);
-            }
-
-            @Override
-            public void onResults(Bundle results) {
-
-                if (!running || speaking) {
-                    return;
-                }
-
-                ArrayList<String> matches =
-                        results.getStringArrayList(
-                                SpeechRecognizer.RESULTS_RECOGNITION
-                        );
-
-                if (matches != null && !matches.isEmpty()) {
-
-                    String text = matches.get(0).trim();
-
-                    if (!text.isEmpty()) {
-
-                        listener.onResult(text);
-
-                        // Result process hone ke baad thoda pause.
-                        restartListening(800);
-
-                        return;
-                    }
-                }
-
-                restartListening(400);
-            }
-
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {
-            }
-        });
-    }
-
-    private void beginListening() {
-
-        if (!running || speaking || recognizer == null) {
-            return;
-        }
-
         try {
+
+            recognizer =
+                    SpeechRecognizer.createSpeechRecognizer(context);
+
+            recognizer.setRecognitionListener(
+                    new RecognitionListener() {
+
+                        @Override
+                        public void onReadyForSpeech(Bundle params) {
+
+                            if (running && !speaking) {
+                                listener.onListening();
+                            }
+                        }
+
+                        @Override
+                        public void onBeginningOfSpeech() {
+
+                            listener.onListening();
+                        }
+
+                        @Override
+                        public void onRmsChanged(float rmsdB) {
+                        }
+
+                        @Override
+                        public void onBufferReceived(byte[] buffer) {
+                        }
+
+                        @Override
+                        public void onEndOfSpeech() {
+                        }
+
+                        @Override
+                        public void onError(int error) {
+
+                            if (!running || speaking) {
+                                return;
+                            }
+
+                            listener.onError(
+                                    "Recognition error code: " + error
+                            );
+
+                            restart(1000);
+                        }
+
+                        @Override
+                        public void onResults(Bundle results) {
+
+                            if (!running || speaking) {
+                                return;
+                            }
+
+                            ArrayList<String> matches =
+                                    results.getStringArrayList(
+                                            SpeechRecognizer.RESULTS_RECOGNITION
+                                    );
+
+                            if (matches != null
+                                    && !matches.isEmpty()) {
+
+                                String text =
+                                        matches.get(0).trim();
+
+                                if (!text.isEmpty()) {
+
+                                    listener.onResult(text);
+
+                                    restart(800);
+                                    return;
+                                }
+                            }
+
+                            listener.onError(
+                                    "Speech detect hui, lekin result empty hai."
+                            );
+
+                            restart(500);
+                        }
+
+                        @Override
+                        public void onPartialResults(
+                                Bundle partialResults) {
+                        }
+
+                        @Override
+                        public void onEvent(
+                                int eventType,
+                                Bundle params) {
+                        }
+                    }
+            );
 
             Intent intent = new Intent(
                     RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -175,8 +158,8 @@ public class VoiceEngine {
             );
 
             /*
-             * Indian English / Hinglish ke liye English-India.
-             * Baad mein language detection aur better banayenge.
+             * Indian English.
+             * Hinglish testing ke liye pehle ye use kar rahe hain.
              */
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
@@ -188,35 +171,34 @@ public class VoiceEngine {
                     "en-IN"
             );
 
-            /*
-             * Partial results abhi off rakhe hain.
-             * Pehle stable final-result system banayenge.
-             */
-            intent.putExtra(
-                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                    false
-            );
-
             intent.putExtra(
                     RecognizerIntent.EXTRA_MAX_RESULTS,
                     5
             );
 
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                    false
+            );
+
             /*
-             * User ke rukne ke baad result finalize.
+             * User ke rukne ke baad recognition complete.
              */
             intent.putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    RecognizerIntent
+                            .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
                     1800
             );
 
             intent.putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    1200
+                    RecognizerIntent
+                            .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    2500
             );
 
             intent.putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                    RecognizerIntent
+                            .EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
                     1000
             );
 
@@ -224,40 +206,30 @@ public class VoiceEngine {
 
         } catch (Exception e) {
 
-            listener.onError("Microphone listening start nahi ho payi.");
+            listener.onError(
+                    "Recognizer start error: " + e.getMessage()
+            );
 
-            restartListening(1000);
+            restart(1500);
         }
     }
 
-    private void restartListening(long delay) {
-
-        if (!running || speaking) {
-            return;
-        }
+    private void restart(long delay) {
 
         handler.postDelayed(() -> {
 
-            if (!running || speaking) {
-                return;
+            if (running && !speaking) {
+                startRecognition();
             }
-
-            startNewRecognition();
 
         }, delay);
     }
 
-    /*
-     * JARVIS jab bolega tab listening temporarily stop hogi.
-     */
     public void setSpeaking(boolean value) {
 
         speaking = value;
 
         if (speaking) {
-
-            handler.removeCallbacksAndMessages(null);
-            restarting = false;
 
             if (recognizer != null) {
 
@@ -270,7 +242,7 @@ public class VoiceEngine {
         } else {
 
             if (running) {
-                restartListening(300);
+                restart(500);
             }
         }
     }
@@ -297,7 +269,6 @@ public class VoiceEngine {
 
         running = false;
         speaking = false;
-        restarting = false;
 
         handler.removeCallbacksAndMessages(null);
 
