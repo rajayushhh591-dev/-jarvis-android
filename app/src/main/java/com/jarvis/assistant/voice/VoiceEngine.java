@@ -28,6 +28,8 @@ public class VoiceEngine {
 
     private boolean running = false;
     private boolean speaking = false;
+    private boolean listening = false;
+    private boolean restartScheduled = false;
 
     public VoiceEngine(Context context, Listener listener) {
         this.context = context;
@@ -37,116 +39,110 @@ public class VoiceEngine {
     public void start() {
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            listener.onError("Speech recognition service available nahi hai.");
+            listener.onError("Speech recognition available nahi hai.");
             return;
         }
 
         running = true;
-        startRecognition();
+        speaking = false;
+
+        createRecognizer();
+        startListening();
     }
 
-    private void startRecognition() {
+    private void createRecognizer() {
 
-        if (!running || speaking) {
+        if (recognizer != null) {
             return;
         }
 
-        destroyRecognizer();
+        recognizer = SpeechRecognizer.createSpeechRecognizer(context);
+
+        recognizer.setRecognitionListener(new RecognitionListener() {
+
+            @Override
+            public void onReadyForSpeech(Bundle params) {
+                listening = true;
+
+                if (running && !speaking) {
+                    listener.onListening();
+                }
+            }
+
+            @Override
+            public void onBeginningOfSpeech() {
+                listening = true;
+            }
+
+            @Override
+            public void onRmsChanged(float rmsdB) {
+            }
+
+            @Override
+            public void onBufferReceived(byte[] buffer) {
+            }
+
+            @Override
+            public void onEndOfSpeech() {
+                listening = false;
+            }
+
+            @Override
+            public void onError(int error) {
+
+                listening = false;
+
+                if (!running || speaking) {
+                    return;
+                }
+
+                // Normal "no match" / timeout errors ko screen par spam nahi karna.
+                scheduleRestart(500);
+            }
+
+            @Override
+            public void onResults(Bundle results) {
+
+                listening = false;
+
+                if (!running || speaking) {
+                    return;
+                }
+
+                ArrayList<String> matches =
+                        results.getStringArrayList(
+                                SpeechRecognizer.RESULTS_RECOGNITION
+                        );
+
+                if (matches != null && !matches.isEmpty()) {
+
+                    String text = matches.get(0).trim();
+
+                    if (!text.isEmpty()) {
+                        listener.onResult(text);
+                    }
+                }
+
+                scheduleRestart(500);
+            }
+
+            @Override
+            public void onPartialResults(Bundle partialResults) {
+            }
+
+            @Override
+            public void onEvent(int eventType, Bundle params) {
+            }
+        });
+    }
+
+    private void startListening() {
+
+        if (!running || speaking || listening || recognizer == null) {
+            return;
+        }
 
         try {
-
-            recognizer =
-                    SpeechRecognizer.createSpeechRecognizer(context);
-
-            recognizer.setRecognitionListener(
-                    new RecognitionListener() {
-
-                        @Override
-                        public void onReadyForSpeech(Bundle params) {
-
-                            if (running && !speaking) {
-                                listener.onListening();
-                            }
-                        }
-
-                        @Override
-                        public void onBeginningOfSpeech() {
-
-                            listener.onListening();
-                        }
-
-                        @Override
-                        public void onRmsChanged(float rmsdB) {
-                        }
-
-                        @Override
-                        public void onBufferReceived(byte[] buffer) {
-                        }
-
-                        @Override
-                        public void onEndOfSpeech() {
-                        }
-
-                        @Override
-                        public void onError(int error) {
-
-                            if (!running || speaking) {
-                                return;
-                            }
-
-                            listener.onError(
-                                    "Recognition error code: " + error
-                            );
-
-                            restart(1000);
-                        }
-
-                        @Override
-                        public void onResults(Bundle results) {
-
-                            if (!running || speaking) {
-                                return;
-                            }
-
-                            ArrayList<String> matches =
-                                    results.getStringArrayList(
-                                            SpeechRecognizer.RESULTS_RECOGNITION
-                                    );
-
-                            if (matches != null
-                                    && !matches.isEmpty()) {
-
-                                String text =
-                                        matches.get(0).trim();
-
-                                if (!text.isEmpty()) {
-
-                                    listener.onResult(text);
-
-                                    restart(800);
-                                    return;
-                                }
-                            }
-
-                            listener.onError(
-                                    "Speech detect hui, lekin result empty hai."
-                            );
-
-                            restart(500);
-                        }
-
-                        @Override
-                        public void onPartialResults(
-                                Bundle partialResults) {
-                        }
-
-                        @Override
-                        public void onEvent(
-                                int eventType,
-                                Bundle params) {
-                        }
-                    }
-            );
 
             Intent intent = new Intent(
                     RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -157,23 +153,14 @@ public class VoiceEngine {
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             );
 
-            /*
-             * Indian English.
-             * Hinglish testing ke liye pehle ye use kar rahe hain.
-             */
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
-                    "en-IN"
+                    Locale.getDefault()
             );
 
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                    "en-IN"
-            );
-
-            intent.putExtra(
-                    RecognizerIntent.EXTRA_MAX_RESULTS,
-                    5
+                    Locale.getDefault()
             );
 
             intent.putExtra(
@@ -181,46 +168,48 @@ public class VoiceEngine {
                     false
             );
 
-            /*
-             * User ke rukne ke baad recognition complete.
-             */
             intent.putExtra(
-                    RecognizerIntent
-                            .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    1800
+                    RecognizerIntent.EXTRA_MAX_RESULTS,
+                    5
             );
 
+            // User ko naturally pause karne ka time.
             intent.putExtra(
-                    RecognizerIntent
-                            .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
                     2500
             );
 
             intent.putExtra(
-                    RecognizerIntent
-                            .EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                    1000
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    2000
             );
 
             recognizer.startListening(intent);
 
         } catch (Exception e) {
 
-            listener.onError(
-                    "Recognizer start error: " + e.getMessage()
-            );
-
-            restart(1500);
+            listening = false;
+            scheduleRestart(1000);
         }
     }
 
-    private void restart(long delay) {
+    private void scheduleRestart(long delay) {
+
+        if (!running || speaking || restartScheduled) {
+            return;
+        }
+
+        restartScheduled = true;
 
         handler.postDelayed(() -> {
 
-            if (running && !speaking) {
-                startRecognition();
+            restartScheduled = false;
+
+            if (!running || speaking) {
+                return;
             }
+
+            startListening();
 
         }, delay);
     }
@@ -231,8 +220,11 @@ public class VoiceEngine {
 
         if (speaking) {
 
-            if (recognizer != null) {
+            handler.removeCallbacksAndMessages(null);
+            restartScheduled = false;
+            listening = false;
 
+            if (recognizer != null) {
                 try {
                     recognizer.cancel();
                 } catch (Exception ignored) {
@@ -242,12 +234,19 @@ public class VoiceEngine {
         } else {
 
             if (running) {
-                restart(500);
+                scheduleRestart(400);
             }
         }
     }
 
-    private void destroyRecognizer() {
+    public void stop() {
+
+        running = false;
+        speaking = false;
+        listening = false;
+        restartScheduled = false;
+
+        handler.removeCallbacksAndMessages(null);
 
         if (recognizer != null) {
 
@@ -263,15 +262,5 @@ public class VoiceEngine {
 
             recognizer = null;
         }
-    }
-
-    public void stop() {
-
-        running = false;
-        speaking = false;
-
-        handler.removeCallbacksAndMessages(null);
-
-        destroyRecognizer();
     }
 }
