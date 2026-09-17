@@ -24,8 +24,10 @@ public class VoiceEngine {
     private final Listener listener;
 
     private SpeechRecognizer recognizer;
-    private boolean running = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private boolean running = false;
+    private boolean speaking = false;
 
     public VoiceEngine(Context context, Listener listener) {
         this.context = context;
@@ -39,7 +41,14 @@ public class VoiceEngine {
             return;
         }
 
-        stopRecognizerOnly();
+        running = true;
+        createRecognizer();
+        startListening();
+    }
+
+    private void createRecognizer() {
+
+        stopRecognizer();
 
         recognizer = SpeechRecognizer.createSpeechRecognizer(context);
 
@@ -47,7 +56,9 @@ public class VoiceEngine {
 
             @Override
             public void onReadyForSpeech(Bundle params) {
-                listener.onListening();
+                if (running && !speaking) {
+                    listener.onListening();
+                }
             }
 
             @Override
@@ -68,13 +79,20 @@ public class VoiceEngine {
 
             @Override
             public void onError(int error) {
-                if (running) {
-                    restartListening();
+
+                if (!running || speaking) {
+                    return;
                 }
+
+                restartAfterDelay(700);
             }
 
             @Override
             public void onResults(Bundle results) {
+
+                if (!running || speaking) {
+                    return;
+                }
 
                 ArrayList<String> matches =
                         results.getStringArrayList(
@@ -86,15 +104,18 @@ public class VoiceEngine {
                     String text = matches.get(0).trim();
 
                     if (!text.isEmpty()) {
+
+                        // Pehle result MainActivity ko denge.
                         listener.onResult(text);
+
+                        // Phir nayi listening start hogi.
+                        restartAfterDelay(1200);
+
+                        return;
                     }
                 }
 
-                // Result ke turant baad restart nahi karna.
-                // Thoda delay rakhenge.
-                if (running) {
-                    restartListening();
-                }
+                restartAfterDelay(700);
             }
 
             @Override
@@ -105,14 +126,11 @@ public class VoiceEngine {
             public void onEvent(int eventType, Bundle params) {
             }
         });
-
-        running = true;
-        startRecognition();
     }
 
-    private void startRecognition() {
+    private void startListening() {
 
-        if (!running || recognizer == null) {
+        if (!running || speaking || recognizer == null) {
             return;
         }
 
@@ -127,11 +145,18 @@ public class VoiceEngine {
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             );
 
+            // Hindi + English ke liye phone ki default language use hogi.
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
                     Locale.getDefault()
             );
 
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                    Locale.getDefault()
+            );
+
+            // Speech complete hone ka wait.
             intent.putExtra(
                     RecognizerIntent.EXTRA_PARTIAL_RESULTS,
                     false
@@ -139,34 +164,66 @@ public class VoiceEngine {
 
             intent.putExtra(
                     RecognizerIntent.EXTRA_MAX_RESULTS,
-                    3
+                    5
+            );
+
+            // Silence ke baad result finalize hoga.
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    1500
+            );
+
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    1000
             );
 
             recognizer.startListening(intent);
 
         } catch (Exception e) {
-            listener.onError("Voice start nahi ho payi.");
+
+            listener.onError("Listening start nahi ho payi.");
+
+            restartAfterDelay(1000);
         }
     }
 
-    private void restartListening() {
+    private void restartAfterDelay(long delay) {
 
         handler.postDelayed(() -> {
 
-            if (running && recognizer != null) {
-                startRecognition();
+            if (!running || speaking) {
+                return;
             }
 
-        }, 1000);
+            createRecognizer();
+            startListening();
+
+        }, delay);
     }
 
-    private void stopRecognizerOnly() {
+    public void setSpeaking(boolean value) {
+
+        speaking = value;
+
+        if (speaking) {
+
+            if (recognizer != null) {
+                try {
+                    recognizer.cancel();
+                } catch (Exception ignored) {
+                }
+            }
+
+        } else {
+
+            restartAfterDelay(500);
+        }
+    }
+
+    private void stopRecognizer() {
 
         if (recognizer != null) {
-            try {
-                recognizer.stopListening();
-            } catch (Exception ignored) {
-            }
 
             try {
                 recognizer.cancel();
@@ -185,9 +242,10 @@ public class VoiceEngine {
     public void stop() {
 
         running = false;
+        speaking = false;
 
         handler.removeCallbacksAndMessages(null);
 
-        stopRecognizerOnly();
+        stopRecognizer();
     }
 }
