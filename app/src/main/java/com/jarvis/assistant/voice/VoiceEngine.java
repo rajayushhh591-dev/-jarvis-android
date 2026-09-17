@@ -28,6 +28,7 @@ public class VoiceEngine {
 
     private boolean running = false;
     private boolean speaking = false;
+    private boolean restarting = false;
 
     public VoiceEngine(Context context, Listener listener) {
         this.context = context;
@@ -42,13 +43,36 @@ public class VoiceEngine {
         }
 
         running = true;
-        createRecognizer();
-        startListening();
+        speaking = false;
+
+        startNewRecognition();
+    }
+
+    private void startNewRecognition() {
+
+        if (!running || speaking || restarting) {
+            return;
+        }
+
+        restarting = true;
+
+        handler.postDelayed(() -> {
+
+            restarting = false;
+
+            if (!running || speaking) {
+                return;
+            }
+
+            createRecognizer();
+            beginListening();
+
+        }, 300);
     }
 
     private void createRecognizer() {
 
-        stopRecognizer();
+        destroyRecognizer();
 
         recognizer = SpeechRecognizer.createSpeechRecognizer(context);
 
@@ -56,6 +80,7 @@ public class VoiceEngine {
 
             @Override
             public void onReadyForSpeech(Bundle params) {
+
                 if (running && !speaking) {
                     listener.onListening();
                 }
@@ -63,10 +88,12 @@ public class VoiceEngine {
 
             @Override
             public void onBeginningOfSpeech() {
+                // User ne bolna start kar diya.
             }
 
             @Override
             public void onRmsChanged(float rmsdB) {
+                // Voice level available hai.
             }
 
             @Override
@@ -75,6 +102,8 @@ public class VoiceEngine {
 
             @Override
             public void onEndOfSpeech() {
+                // User ruk gaya.
+                // Android result process karega.
             }
 
             @Override
@@ -84,7 +113,8 @@ public class VoiceEngine {
                     return;
                 }
 
-                restartAfterDelay(700);
+                // Temporary recognition errors ko automatically recover karo.
+                restartListening(500);
             }
 
             @Override
@@ -105,17 +135,16 @@ public class VoiceEngine {
 
                     if (!text.isEmpty()) {
 
-                        // Pehle result MainActivity ko denge.
                         listener.onResult(text);
 
-                        // Phir nayi listening start hogi.
-                        restartAfterDelay(1200);
+                        // Result process hone ke baad thoda pause.
+                        restartListening(800);
 
                         return;
                     }
                 }
 
-                restartAfterDelay(700);
+                restartListening(400);
             }
 
             @Override
@@ -128,7 +157,7 @@ public class VoiceEngine {
         });
     }
 
-    private void startListening() {
+    private void beginListening() {
 
         if (!running || speaking || recognizer == null) {
             return;
@@ -145,18 +174,24 @@ public class VoiceEngine {
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             );
 
-            // Hindi + English ke liye phone ki default language use hogi.
+            /*
+             * Indian English / Hinglish ke liye English-India.
+             * Baad mein language detection aur better banayenge.
+             */
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
-                    Locale.getDefault()
+                    "en-IN"
             );
 
             intent.putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                    Locale.getDefault()
+                    "en-IN"
             );
 
-            // Speech complete hone ka wait.
+            /*
+             * Partial results abhi off rakhe hain.
+             * Pehle stable final-result system banayenge.
+             */
             intent.putExtra(
                     RecognizerIntent.EXTRA_PARTIAL_RESULTS,
                     false
@@ -167,14 +202,21 @@ public class VoiceEngine {
                     5
             );
 
-            // Silence ke baad result finalize hoga.
+            /*
+             * User ke rukne ke baad result finalize.
+             */
             intent.putExtra(
                     RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    1500
+                    1800
             );
 
             intent.putExtra(
                     RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    1200
+            );
+
+            intent.putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
                     1000
             );
 
@@ -182,13 +224,17 @@ public class VoiceEngine {
 
         } catch (Exception e) {
 
-            listener.onError("Listening start nahi ho payi.");
+            listener.onError("Microphone listening start nahi ho payi.");
 
-            restartAfterDelay(1000);
+            restartListening(1000);
         }
     }
 
-    private void restartAfterDelay(long delay) {
+    private void restartListening(long delay) {
+
+        if (!running || speaking) {
+            return;
+        }
 
         handler.postDelayed(() -> {
 
@@ -196,19 +242,25 @@ public class VoiceEngine {
                 return;
             }
 
-            createRecognizer();
-            startListening();
+            startNewRecognition();
 
         }, delay);
     }
 
+    /*
+     * JARVIS jab bolega tab listening temporarily stop hogi.
+     */
     public void setSpeaking(boolean value) {
 
         speaking = value;
 
         if (speaking) {
 
+            handler.removeCallbacksAndMessages(null);
+            restarting = false;
+
             if (recognizer != null) {
+
                 try {
                     recognizer.cancel();
                 } catch (Exception ignored) {
@@ -217,11 +269,13 @@ public class VoiceEngine {
 
         } else {
 
-            restartAfterDelay(500);
+            if (running) {
+                restartListening(300);
+            }
         }
     }
 
-    private void stopRecognizer() {
+    private void destroyRecognizer() {
 
         if (recognizer != null) {
 
@@ -243,9 +297,10 @@ public class VoiceEngine {
 
         running = false;
         speaking = false;
+        restarting = false;
 
         handler.removeCallbacksAndMessages(null);
 
-        stopRecognizer();
+        destroyRecognizer();
     }
 }
