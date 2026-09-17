@@ -27,7 +27,6 @@ public class MainActivity extends Activity
     private boolean ttsReady = false;
     private boolean microphoneReady = false;
     private boolean jarvisStarted = false;
-    private boolean startupGreeting = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,11 +45,7 @@ public class MainActivity extends Activity
         layout.setBackgroundColor(Color.BLACK);
 
         statusText = new TextView(this);
-
-        statusText.setText(
-                "JARVIS\n\nInitializing..."
-        );
-
+        statusText.setText("JARVIS\n\nInitializing...");
         statusText.setTextColor(Color.CYAN);
         statusText.setTextSize(24);
         statusText.setGravity(Gravity.CENTER);
@@ -113,68 +108,63 @@ public class MainActivity extends Activity
 
                         ttsReady = true;
 
-                        textToSpeech
-                                .setOnUtteranceProgressListener(
-                                        new UtteranceProgressListener() {
+                        textToSpeech.setOnUtteranceProgressListener(
+                                new UtteranceProgressListener() {
 
-                                            @Override
-                                            public void onStart(
-                                                    String utteranceId) {
+                                    @Override
+                                    public void onStart(
+                                            String utteranceId) {
+                                    }
+
+                                    @Override
+                                    public void onDone(
+                                            String utteranceId) {
+
+                                        runOnUiThread(() -> {
+
+                                            if ("STARTUP".equals(
+                                                    utteranceId)) {
+
+                                                // Greeting finished.
+                                                // Now start microphone.
+                                                startListening();
+
+                                            } else {
+
+                                                // JARVIS finished speaking.
+                                                // Start listening again.
+                                                if (voiceEngine != null) {
+                                                    voiceEngine
+                                                            .setSpeaking(false);
+                                                }
                                             }
+                                        });
+                                    }
 
-                                            @Override
-                                            public void onDone(
-                                                    String utteranceId) {
+                                    @Override
+                                    public void onError(
+                                            String utteranceId) {
 
-                                                runOnUiThread(() -> {
+                                        runOnUiThread(() -> {
 
-                                                    if ("STARTUP"
-                                                            .equals(utteranceId)) {
+                                            if ("STARTUP".equals(
+                                                    utteranceId)) {
 
-                                                        startupGreeting = false;
+                                                // Even if startup TTS
+                                                // has an error, try listening.
+                                                startListening();
 
-                                                        startListening();
-                                                    }
+                                            } else {
 
-                                                    else {
-
-                                                        if (voiceEngine != null) {
-                                                            voiceEngine
-                                                                    .setSpeaking(
-                                                                            false
-                                                                    );
-                                                        }
-                                                    }
-                                                });
+                                                if (voiceEngine != null) {
+                                                    voiceEngine
+                                                            .setSpeaking(false);
+                                                }
                                             }
-
-                                            @Override
-                                            public void onError(
-                                                    String utteranceId) {
-
-                                                runOnUiThread(() -> {
-
-                                                    if ("STARTUP"
-                                                            .equals(utteranceId)) {
-
-                                                        startupGreeting = false;
-
-                                                        startListening();
-                                                    }
-
-                                                    else {
-
-                                                        if (voiceEngine != null) {
-                                                            voiceEngine
-                                                                    .setSpeaking(
-                                                                            false
-                                                                    );
-                                                        }
-                                                    }
-                                                });
-                                            }
-                                        }
-                                );
+                                        });
+                                    }
+                                }
+                        );
 
                         startJarvis();
 
@@ -184,7 +174,7 @@ public class MainActivity extends Activity
                                 "JARVIS\n\nTTS start nahi ho saka."
                         );
 
-                        // TTS fail ho tab bhi listening try karo.
+                        // TTS fail hone par bhi microphone try karo.
                         startListening();
                     }
                 }
@@ -210,7 +200,6 @@ public class MainActivity extends Activity
         }
 
         jarvisStarted = true;
-        startupGreeting = true;
 
         showStatus(
                 "JARVIS\n\nHello."
@@ -236,23 +225,10 @@ public class MainActivity extends Activity
             return;
         }
 
-        if (!voiceEngineIsRunning()) {
-
-            voiceEngine.start();
-
-        } else {
-
-            voiceEngine.setSpeaking(false);
-        }
-    }
-
-    /*
-     * VoiceEngine ke andar direct running state expose nahi hai.
-     * Isliye start() ko safely ek baar call karne ke liye
-     * startup flag use kar rahe hain.
-     */
-    private boolean voiceEngineIsRunning() {
-        return jarvisStarted && !startupGreeting;
+        // IMPORTANT:
+        // Startup greeting ke baad actual
+        // SpeechRecognizer yahin start hota hai.
+        voiceEngine.start();
     }
 
     // =====================================================
@@ -348,7 +324,7 @@ public class MainActivity extends Activity
             return;
         }
 
-        // Recognition ke normal errors ko screen par
+        // Normal recognition errors ko screen par
         // repeatedly nahi dikhana.
         if (error.contains("available")) {
 
@@ -374,6 +350,10 @@ public class MainActivity extends Activity
             reply("Good morning.");
 
         }
+
+        // -------------------------
+        // HELLO
+        // -------------------------
 
         else if (command.contains("hello jarvis")
                 || command.contains("hello")
@@ -501,7 +481,7 @@ public class MainActivity extends Activity
         }
 
         // -------------------------
-        // UNKNOWN
+        // UNKNOWN COMMAND
         // -------------------------
 
         else {
@@ -544,6 +524,7 @@ public class MainActivity extends Activity
             return;
         }
 
+        // Normal reply ke time recognition pause karo.
         if (!"STARTUP".equals(utteranceId)) {
 
             if (voiceEngine != null) {
