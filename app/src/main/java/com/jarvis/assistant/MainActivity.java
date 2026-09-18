@@ -21,6 +21,8 @@ import java.util.Locale;
 public class MainActivity extends Activity
         implements VoiceEngine.Listener {
 
+    private static final int CAMERA_REQUEST = 200;
+
     private TextView statusText;
 
     private VoiceEngine voiceEngine;
@@ -29,6 +31,8 @@ public class MainActivity extends Activity
     private boolean ttsReady = false;
     private boolean microphoneReady = false;
     private boolean jarvisStarted = false;
+
+    private boolean photoMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -222,23 +226,6 @@ public class MainActivity extends Activity
     @Override
     public void onResult(String text) {
 
-            else if (command.contains("take a photo")
-        || command.contains("take photo")
-        || command.contains("capture photo")
-        || command.contains("click a photo")) {
-
-    reply("Photo lene ke liye camera khol raha hoon.");
-
-    try {
-        Intent intent =
-                new Intent("android.media.action.IMAGE_CAPTURE");
-
-        startActivityForResult(intent, 200);
-
-    } catch (Exception e) {
-        reply("Photo capture nahi ho saka.");
-    }
-            }
         if (text == null) return;
 
         text = text.trim();
@@ -312,6 +299,34 @@ public class MainActivity extends Activity
         }
 
         // -------------------------
+        // TAKE PHOTO
+        // -------------------------
+
+        else if (command.contains("take a photo")
+                || command.contains("take photo")
+                || command.contains("capture photo")
+                || command.contains("click a photo")
+                || command.contains("take picture")
+                || command.contains("take a picture")) {
+
+            openCameraForPhoto();
+        }
+
+        // -------------------------
+        // ONE MORE PHOTO
+        // -------------------------
+
+        else if (command.contains("one more photo")
+                || command.contains("another photo")
+                || command.contains("one more picture")
+                || command.contains("another picture")
+                || command.contains("ek aur photo")
+                || command.contains("ek aur picture")) {
+
+            openCameraForPhoto();
+        }
+
+        // -------------------------
         // YOUTUBE
         // -------------------------
 
@@ -343,19 +358,7 @@ public class MainActivity extends Activity
 
             reply("Camera khol raha hoon.");
 
-            try {
-
-                Intent intent =
-                        new Intent(
-                                "android.media.action.IMAGE_CAPTURE"
-                        );
-
-                startActivity(intent);
-
-            } catch (Exception e) {
-
-                reply("Camera open nahi ho saka.");
-            }
+            openCamera();
         }
 
         // -------------------------
@@ -404,8 +407,11 @@ public class MainActivity extends Activity
             appName = appName.trim();
 
             if (!appName.isEmpty()) {
+
                 openAppByName(appName);
+
             } else {
+
                 reply("Kaunsa app kholna hai?");
             }
         }
@@ -433,6 +439,94 @@ public class MainActivity extends Activity
             reply(
                     "Sorry, main abhi is command ko nahi samajh paaya."
             );
+        }
+    }
+
+    // =====================================================
+    // OPEN CAMERA FOR PHOTO
+    // =====================================================
+
+    private void openCameraForPhoto() {
+
+        photoMode = true;
+
+        reply("Camera khol raha hoon. Photo lene ke baad wapas aa jana.");
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            "android.media.action.IMAGE_CAPTURE"
+                    );
+
+            startActivityForResult(
+                    intent,
+                    CAMERA_REQUEST
+            );
+
+        } catch (Exception e) {
+
+            photoMode = false;
+
+            reply("Camera open nahi ho saka.");
+        }
+    }
+
+    // =====================================================
+    // OPEN CAMERA
+    // =====================================================
+
+    private void openCamera() {
+
+        photoMode = false;
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            "android.media.action.IMAGE_CAPTURE"
+                    );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            reply("Camera open nahi ho saka.");
+        }
+    }
+
+    // =====================================================
+    // CAMERA RESULT
+    // =====================================================
+
+    @Override
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data) {
+
+        super.onActivityResult(
+                requestCode,
+                resultCode,
+                data
+        );
+
+        if (requestCode == CAMERA_REQUEST) {
+
+            photoMode = false;
+
+            if (resultCode == RESULT_OK) {
+
+                reply(
+                        "Photo ho gayi. Ek aur photo?"
+                );
+
+            } else {
+
+                reply(
+                        "Theek hai."
+                );
+            }
         }
     }
 
