@@ -10,6 +10,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class VoiceEngine {
 
@@ -22,48 +23,43 @@ public class VoiceEngine {
     private final Context context;
     private final Listener listener;
 
+    private SpeechRecognizer recognizer;
     private final Handler handler =
             new Handler(Looper.getMainLooper());
-
-    private SpeechRecognizer recognizer;
 
     private boolean running = false;
     private boolean speaking = false;
     private boolean listening = false;
-    private boolean restartScheduled = false;
 
     public VoiceEngine(Context context, Listener listener) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.listener = listener;
     }
 
     public void start() {
 
-        handler.post(() -> {
-
-            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-                listener.onError(
-                        "Speech recognition available nahi hai."
-                );
-                return;
-            }
-
-            running = true;
-            speaking = false;
-
-            startRecognition();
-        });
-    }
-
-    private void startRecognition() {
-
-        if (!running || speaking || listening) {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            listener.onError(
+                    "Speech recognition service available nahi hai."
+            );
             return;
         }
 
-        restartScheduled = false;
+        running = true;
+        speaking = false;
 
-        destroyRecognizer();
+        createRecognizer();
+        startListening();
+    }
+
+    private void createRecognizer() {
+
+        if (recognizer != null) {
+            try {
+                recognizer.destroy();
+            } catch (Exception ignored) {
+            }
+        }
 
         recognizer =
                 SpeechRecognizer.createSpeechRecognizer(context);
@@ -85,11 +81,6 @@ public class VoiceEngine {
 
                     @Override
                     public void onBeginningOfSpeech() {
-
-                        if (!running || speaking) {
-                            return;
-                        }
-
                         listening = true;
                     }
 
@@ -116,7 +107,11 @@ public class VoiceEngine {
                             return;
                         }
 
-                        scheduleRestart(700);
+                        listener.onError(
+                                "Recognition error: " + error
+                        );
+
+                        restart(800);
                     }
 
                     @Override
@@ -134,35 +129,54 @@ public class VoiceEngine {
                                         SpeechRecognizer.RESULTS_RECOGNITION
                                 );
 
-                        String text = null;
+                        if (matches != null
+                                && !matches.isEmpty()) {
 
-                        if (matches != null) {
+                            String text =
+                                    matches.get(0);
 
-                            for (String item : matches) {
+                            if (text != null) {
+                                text = text.trim();
+                            }
 
-                                if (item != null
-                                        && !item.trim().isEmpty()) {
+                            if (text != null
+                                    && !text.isEmpty()) {
 
-                                    text = item.trim();
-                                    break;
-                                }
+                                listener.onResult(text);
                             }
                         }
 
-                        if (text != null
-                                && !text.isEmpty()) {
-
-                            listener.onResult(text);
-
-                        } else {
-
-                            scheduleRestart(500);
-                        }
+                        restart(500);
                     }
 
                     @Override
                     public void onPartialResults(
                             Bundle partialResults) {
+
+                        if (!running || speaking) {
+                            return;
+                        }
+
+                        ArrayList<String> matches =
+                                partialResults
+                                        .getStringArrayList(
+                                                SpeechRecognizer
+                                                        .RESULTS_RECOGNITION
+                                        );
+
+                        if (matches != null
+                                && !matches.isEmpty()) {
+
+                            String text =
+                                    matches.get(0);
+
+                            if (text != null
+                                    && !text.trim().isEmpty()) {
+
+                                // Partial result intentionally
+                                // not sent as final command.
+                            }
+                        }
                     }
 
                     @Override
@@ -172,6 +186,16 @@ public class VoiceEngine {
                     }
                 }
         );
+    }
+
+    private void startListening() {
+
+        if (!running
+                || speaking
+                || listening
+                || recognizer == null) {
+            return;
+        }
 
         try {
 
@@ -196,13 +220,8 @@ public class VoiceEngine {
             );
 
             intent.putExtra(
-                    RecognizerIntent.EXTRA_CALLING_PACKAGE,
-                    context.getPackageName()
-            );
-
-            intent.putExtra(
                     RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                    false
+                    true
             );
 
             intent.putExtra(
@@ -211,15 +230,8 @@ public class VoiceEngine {
             );
 
             intent.putExtra(
-                    RecognizerIntent
-                            .EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    2500
-            );
-
-            intent.putExtra(
-                    RecognizerIntent
-                            .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    2000
+                    RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                    context.getPackageName()
             );
 
             recognizer.startListening(intent);
@@ -227,67 +239,72 @@ public class VoiceEngine {
         } catch (Exception e) {
 
             listening = false;
-            scheduleRestart(1000);
+
+            listener.onError(
+                    "Start listening error: "
+                            + e.getClass().getSimpleName()
+            );
+
+            restart(1000);
         }
     }
 
-    private void scheduleRestart(long delay) {
+    private void restart(long delay) {
 
-        if (!running
-                || speaking
-                || restartScheduled) {
-            return;
-        }
+        handler.postDelayed(
+                () -> {
 
-        restartScheduled = true;
+                    if (!running || speaking) {
+                        return;
+                    }
 
-        handler.postDelayed(() -> {
+                    listening = false;
 
-            restartScheduled = false;
+                    if (recognizer != null) {
+                        try {
+                            recognizer.cancel();
+                        } catch (Exception ignored) {
+                        }
+                    }
 
-            if (!running || speaking) {
-                return;
-            }
+                    startListening();
 
-            startRecognition();
-
-        }, delay);
+                },
+                delay
+        );
     }
 
     public void setSpeaking(boolean value) {
 
-        handler.post(() -> {
+        speaking = value;
 
-            speaking = value;
+        if (speaking) {
 
-            if (speaking) {
+            handler.removeCallbacksAndMessages(null);
+            listening = false;
 
-                restartScheduled = false;
-
-                handler.removeCallbacksAndMessages(null);
-
-                listening = false;
-
-                if (recognizer != null) {
-
-                    try {
-                        recognizer.cancel();
-                    } catch (Exception ignored) {
-                    }
-                }
-
-            } else {
-
-                if (running) {
-
-                    listening = false;
-                    scheduleRestart(500);
+            if (recognizer != null) {
+                try {
+                    recognizer.cancel();
+                } catch (Exception ignored) {
                 }
             }
-        });
+
+        } else {
+
+            if (running) {
+                restart(400);
+            }
+        }
     }
 
-    private void destroyRecognizer() {
+    public void stop() {
+
+        running = false;
+        speaking = false;
+        listening = false;
+
+        handler.removeCallbacksAndMessages(null);
 
         if (recognizer != null) {
 
@@ -303,22 +320,5 @@ public class VoiceEngine {
 
             recognizer = null;
         }
-
-        listening = false;
-    }
-
-    public void stop() {
-
-        handler.post(() -> {
-
-            running = false;
-            speaking = false;
-            listening = false;
-            restartScheduled = false;
-
-            handler.removeCallbacksAndMessages(null);
-
-            destroyRecognizer();
-        });
     }
 }
