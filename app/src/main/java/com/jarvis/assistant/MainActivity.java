@@ -222,6 +222,23 @@ public class MainActivity extends Activity
     @Override
     public void onResult(String text) {
 
+            else if (command.contains("take a photo")
+        || command.contains("take photo")
+        || command.contains("capture photo")
+        || command.contains("click a photo")) {
+
+    reply("Photo lene ke liye camera khol raha hoon.");
+
+    try {
+        Intent intent =
+                new Intent("android.media.action.IMAGE_CAPTURE");
+
+        startActivityForResult(intent, 200);
+
+    } catch (Exception e) {
+        reply("Photo capture nahi ho saka.");
+    }
+            }
         if (text == null) return;
 
         text = text.trim();
