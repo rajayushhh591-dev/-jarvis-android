@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -14,6 +15,7 @@ import android.widget.TextView;
 
 import com.jarvis.assistant.voice.VoiceEngine;
 
+import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends Activity
@@ -35,10 +37,6 @@ public class MainActivity extends Activity
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
 
-        // -------------------------
-        // UI
-        // -------------------------
-
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
@@ -51,18 +49,9 @@ public class MainActivity extends Activity
         statusText.setGravity(Gravity.CENTER);
 
         layout.addView(statusText);
-
         setContentView(layout);
 
-        // -------------------------
-        // VOICE ENGINE
-        // -------------------------
-
         voiceEngine = new VoiceEngine(this, this);
-
-        // -------------------------
-        // MICROPHONE PERMISSION
-        // -------------------------
 
         if (checkSelfPermission(
                 Manifest.permission.RECORD_AUDIO
@@ -79,10 +68,6 @@ public class MainActivity extends Activity
                     100
             );
         }
-
-        // -------------------------
-        // TEXT TO SPEECH
-        // -------------------------
 
         textToSpeech = new TextToSpeech(
                 this,
@@ -101,9 +86,7 @@ public class MainActivity extends Activity
                                 languageResult ==
                                 TextToSpeech.LANG_NOT_SUPPORTED) {
 
-                            textToSpeech.setLanguage(
-                                    Locale.US
-                            );
+                            textToSpeech.setLanguage(Locale.US);
                         }
 
                         ttsReady = true;
@@ -125,17 +108,12 @@ public class MainActivity extends Activity
                                             if ("STARTUP".equals(
                                                     utteranceId)) {
 
-                                                // Greeting finished.
-                                                // Now start microphone.
                                                 startListening();
 
                                             } else {
 
-                                                // JARVIS finished speaking.
-                                                // Start listening again.
                                                 if (voiceEngine != null) {
-                                                    voiceEngine
-                                                            .setSpeaking(false);
+                                                    voiceEngine.setSpeaking(false);
                                                 }
                                             }
                                         });
@@ -150,15 +128,12 @@ public class MainActivity extends Activity
                                             if ("STARTUP".equals(
                                                     utteranceId)) {
 
-                                                // Even if startup TTS
-                                                // has an error, try listening.
                                                 startListening();
 
                                             } else {
 
                                                 if (voiceEngine != null) {
-                                                    voiceEngine
-                                                            .setSpeaking(false);
+                                                    voiceEngine.setSpeaking(false);
                                                 }
                                             }
                                         });
@@ -174,36 +149,21 @@ public class MainActivity extends Activity
                                 "JARVIS\n\nTTS start nahi ho saka."
                         );
 
-                        // TTS fail hone par bhi microphone try karo.
                         startListening();
                     }
                 }
         );
     }
 
-    // =====================================================
-    // START JARVIS
-    // =====================================================
-
     private void startJarvis() {
 
-        if (jarvisStarted) {
-            return;
-        }
-
-        if (!microphoneReady) {
-            return;
-        }
-
-        if (!ttsReady) {
-            return;
-        }
+        if (jarvisStarted) return;
+        if (!microphoneReady) return;
+        if (!ttsReady) return;
 
         jarvisStarted = true;
 
-        showStatus(
-                "JARVIS\n\nHello."
-        );
+        showStatus("JARVIS\n\nHello.");
 
         speak(
                 "Jarvis ready.",
@@ -211,29 +171,13 @@ public class MainActivity extends Activity
         );
     }
 
-    // =====================================================
-    // START LISTENING
-    // =====================================================
-
     private void startListening() {
 
-        if (!microphoneReady) {
-            return;
-        }
+        if (!microphoneReady) return;
+        if (voiceEngine == null) return;
 
-        if (voiceEngine == null) {
-            return;
-        }
-
-        // IMPORTANT:
-        // Startup greeting ke baad actual
-        // SpeechRecognizer yahin start hota hai.
         voiceEngine.start();
     }
-
-    // =====================================================
-    // MICROPHONE PERMISSION RESULT
-    // =====================================================
 
     @Override
     public void onRequestPermissionsResult(
@@ -254,7 +198,6 @@ public class MainActivity extends Activity
                     == PackageManager.PERMISSION_GRANTED) {
 
                 microphoneReady = true;
-
                 startJarvis();
 
             } else {
@@ -266,10 +209,6 @@ public class MainActivity extends Activity
         }
     }
 
-    // =====================================================
-    // LISTENING CALLBACK
-    // =====================================================
-
     @Override
     public void onListening() {
 
@@ -280,29 +219,19 @@ public class MainActivity extends Activity
         );
     }
 
-    // =====================================================
-    // SPEECH RESULT
-    // =====================================================
-
     @Override
     public void onResult(String text) {
 
-        if (text == null) {
-            return;
-        }
+        if (text == null) return;
 
         text = text.trim();
 
-        if (text.isEmpty()) {
-            return;
-        }
+        if (text.isEmpty()) return;
 
         final String finalText = text;
 
         String command =
-                text.toLowerCase(
-                        Locale.ROOT
-                ).trim();
+                text.toLowerCase(Locale.ROOT).trim();
 
         runOnUiThread(() ->
                 statusText.setText(
@@ -313,19 +242,11 @@ public class MainActivity extends Activity
         handleCommand(command);
     }
 
-    // =====================================================
-    // RECOGNITION ERROR
-    // =====================================================
-
     @Override
     public void onError(String error) {
 
-        if (error == null) {
-            return;
-        }
+        if (error == null) return;
 
-        // Normal recognition errors ko screen par
-        // repeatedly nahi dikhana.
         if (error.contains("available")) {
 
             showStatus(
@@ -348,7 +269,6 @@ public class MainActivity extends Activity
                 || command.contains("goodmorning")) {
 
             reply("Good morning.");
-
         }
 
         // -------------------------
@@ -360,9 +280,7 @@ public class MainActivity extends Activity
                 || command.contains("hi jarvis")
                 || command.equals("hi")) {
 
-            reply(
-                    "Hello. How can I help you?"
-            );
+            reply("Hello. How can I help you?");
         }
 
         // -------------------------
@@ -383,13 +301,9 @@ public class MainActivity extends Activity
         else if (command.contains("youtube")
                 || command.contains("you tube")) {
 
-            reply(
-                    "YouTube khol raha hoon."
-            );
+            reply("YouTube khol raha hoon.");
 
-            openApp(
-                    "com.google.android.youtube"
-            );
+            openAppByName("youtube");
         }
 
         // -------------------------
@@ -399,13 +313,9 @@ public class MainActivity extends Activity
         else if (command.contains("whatsapp")
                 || command.contains("what's app")) {
 
-            reply(
-                    "WhatsApp khol raha hoon."
-            );
+            reply("WhatsApp khol raha hoon.");
 
-            openApp(
-                    "com.whatsapp"
-            );
+            openAppByName("whatsapp");
         }
 
         // -------------------------
@@ -414,9 +324,7 @@ public class MainActivity extends Activity
 
         else if (command.contains("camera")) {
 
-            reply(
-                    "Camera khol raha hoon."
-            );
+            reply("Camera khol raha hoon.");
 
             try {
 
@@ -429,9 +337,7 @@ public class MainActivity extends Activity
 
             } catch (Exception e) {
 
-                reply(
-                        "Camera open nahi ho saka."
-                );
+                reply("Camera open nahi ho saka.");
             }
         }
 
@@ -442,9 +348,7 @@ public class MainActivity extends Activity
         else if (command.contains("settings")
                 || command.contains("setting")) {
 
-            reply(
-                    "Settings khol raha hoon."
-            );
+            reply("Settings khol raha hoon.");
 
             try {
 
@@ -458,9 +362,34 @@ public class MainActivity extends Activity
 
             } catch (Exception e) {
 
-                reply(
-                        "Settings open nahi ho saka."
-                );
+                reply("Settings open nahi ho saka.");
+            }
+        }
+
+        // -------------------------
+        // GENERIC OPEN APP
+        // -------------------------
+
+        else if (command.startsWith("open ")
+                || command.startsWith("launch ")
+                || command.startsWith("start ")) {
+
+            String appName = command;
+
+            if (appName.startsWith("open ")) {
+                appName = appName.substring(5);
+            } else if (appName.startsWith("launch ")) {
+                appName = appName.substring(7);
+            } else if (appName.startsWith("start ")) {
+                appName = appName.substring(6);
+            }
+
+            appName = appName.trim();
+
+            if (!appName.isEmpty()) {
+                openAppByName(appName);
+            } else {
+                reply("Kaunsa app kholna hai?");
             }
         }
 
@@ -471,9 +400,7 @@ public class MainActivity extends Activity
         else if (command.contains("stop jarvis")
                 || command.contains("close jarvis")) {
 
-            reply(
-                    "Okay. Main ruk raha hoon."
-            );
+            reply("Okay. Main ruk raha hoon.");
 
             if (voiceEngine != null) {
                 voiceEngine.stop();
@@ -481,13 +408,104 @@ public class MainActivity extends Activity
         }
 
         // -------------------------
-        // UNKNOWN COMMAND
+        // UNKNOWN
         // -------------------------
 
         else {
 
             reply(
                     "Sorry, main abhi is command ko nahi samajh paaya."
+            );
+        }
+    }
+
+    // =====================================================
+    // OPEN APP BY NAME
+    // =====================================================
+
+    private void openAppByName(String requestedName) {
+
+        try {
+
+            PackageManager packageManager =
+                    getPackageManager();
+
+            Intent launcherIntent =
+                    new Intent(
+                            Intent.ACTION_MAIN,
+                            null
+                    );
+
+            launcherIntent.addCategory(
+                    Intent.CATEGORY_LAUNCHER
+            );
+
+            List<ResolveInfo> apps =
+                    packageManager.queryIntentActivities(
+                            launcherIntent,
+                            0
+                    );
+
+            String wanted =
+                    requestedName
+                            .toLowerCase(Locale.ROOT)
+                            .trim();
+
+            for (ResolveInfo info : apps) {
+
+                if (info.activityInfo == null) {
+                    continue;
+                }
+
+                CharSequence label =
+                        info.loadLabel(packageManager);
+
+                if (label == null) {
+                    continue;
+                }
+
+                String appLabel =
+                        label.toString()
+                                .toLowerCase(Locale.ROOT)
+                                .trim();
+
+                if (appLabel.equals(wanted)
+                        || appLabel.contains(wanted)
+                        || wanted.contains(appLabel)) {
+
+                    Intent launchIntent =
+                            new Intent();
+
+                    launchIntent.setClassName(
+                            info.activityInfo.packageName,
+                            info.activityInfo.name
+                    );
+
+                    launchIntent.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                    );
+
+                    reply(
+                            label.toString()
+                                    + " khol raha hoon."
+                    );
+
+                    startActivity(launchIntent);
+
+                    return;
+                }
+            }
+
+            reply(
+                    requestedName
+                            + " phone mein nahi mila."
+            );
+
+        } catch (Exception e) {
+
+            reply(
+                    requestedName
+                            + " open nahi ho saka."
             );
         }
     }
@@ -516,15 +534,9 @@ public class MainActivity extends Activity
             String message,
             String utteranceId) {
 
-        if (textToSpeech == null) {
-            return;
-        }
+        if (textToSpeech == null) return;
+        if (!ttsReady) return;
 
-        if (!ttsReady) {
-            return;
-        }
-
-        // Normal reply ke time recognition pause karo.
         if (!"STARTUP".equals(utteranceId)) {
 
             if (voiceEngine != null) {
@@ -538,39 +550,6 @@ public class MainActivity extends Activity
                 null,
                 utteranceId
         );
-    }
-
-    // =====================================================
-    // OPEN APP
-    // =====================================================
-
-    private void openApp(String packageName) {
-
-        try {
-
-            Intent intent =
-                    getPackageManager()
-                            .getLaunchIntentForPackage(
-                                    packageName
-                            );
-
-            if (intent != null) {
-
-                startActivity(intent);
-
-            } else {
-
-                reply(
-                        "Ye app phone mein nahi mili."
-                );
-            }
-
-        } catch (Exception e) {
-
-            reply(
-                    "App open nahi ho saka."
-            );
-        }
     }
 
     // =====================================================
