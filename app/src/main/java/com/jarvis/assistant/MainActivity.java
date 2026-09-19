@@ -453,7 +453,43 @@ public class MainActivity extends Activity {
 
             return;
         }
+// ==============================
+// CALL / DIALER
+// ==============================
 
+private void openDialer(String phoneNumber) {
+
+    face.setState(
+            JarvisFaceView.ACTION
+    );
+
+    status.setText(
+            "⚡ CALL"
+    );
+
+    try {
+
+        Intent intent = new Intent(
+                Intent.ACTION_DIAL,
+                Uri.parse("tel:" + phoneNumber)
+        );
+
+        startActivity(intent);
+
+        speak(
+                "Opening dialer, sir."
+        );
+
+    } catch (Exception e) {
+
+        speak(
+                "Sorry sir, I could not open the dialer."
+        );
+    }
+    
+
+
+    } 
         // CAMERA
 
         if (text.contains("camera")) {
