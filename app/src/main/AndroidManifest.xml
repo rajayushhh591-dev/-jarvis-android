@@ -1,7 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Microphone -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Internet for JARVIS AI brain -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- See installed launcher apps -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
