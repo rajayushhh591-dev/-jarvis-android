@@ -4,32 +4,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Microphone Permission -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission
+        android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Internet Permission -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Installed Apps Detection -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
+    <!-- Internet Permission (Future AI Features) -->
+    <uses-permission
+        android:name="android.permission.INTERNET" />
 
     <application
-        android:theme="@style/AppTheme"
-        android:label="JARVIS"
         android:allowBackup="true"
-        android:supportsRtl="true">
+        android:label="JARVIS"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
             android:name=".MainActivity"
             android:exported="true">
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+
+                <action
+                    android:name="android.intent.action.MAIN" />
+
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
+
             </intent-filter>
 
         </activity>
