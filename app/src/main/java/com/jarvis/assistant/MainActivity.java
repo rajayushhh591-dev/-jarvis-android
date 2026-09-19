@@ -21,6 +21,7 @@ public class MainActivity extends Activity {
 
     private VoiceEngine voice;
     private TextToSpeech tts;
+    private AppLauncher appLauncher;
 
     private JarvisFaceView face;
     private TextView status;
@@ -31,10 +32,12 @@ public class MainActivity extends Activity {
     private static final int MIC_PERMISSION = 100;
 
     @Override
-    protected void onCreate(
-            Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
+
+        // App launcher initialize
+        appLauncher = new AppLauncher(this);
 
         buildUI();
 
@@ -254,7 +257,8 @@ public class MainActivity extends Activity {
 
                             @Override
                             public void onError(
-                                    String id) {}
+                                    String id) {
+                            }
                         });
 
                         running = true;
@@ -294,8 +298,7 @@ public class MainActivity extends Activity {
 
         running = true;
 
-        // TTS welcome message finishes,
-        // then VoiceEngine starts automatically.
+        // VoiceEngine starts after welcome TTS.
     }
 
     @Override
@@ -381,38 +384,72 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // WHATSAPP
+        // OPEN APP BY NAME
+        //
+        // Examples:
+        // "open WhatsApp"
+        // "open Instagram"
+        // "open Snapchat"
+        // "open Telegram"
+
+        if (text.startsWith("open ")) {
+
+            String appName =
+                    original.substring(5).trim();
+
+            if (!appName.isEmpty()) {
+
+                openAppByName(appName);
+
+                return;
+            }
+        }
+
+        // Direct app-name commands
+        //
+        // This also supports:
+        // "WhatsApp kholo"
+        // "Instagram kholo"
+        // "Snapchat kholo"
 
         if (text.contains("whatsapp")) {
 
-            openApp(
-                    "com.whatsapp",
-                    "WhatsApp"
-            );
+            openAppByName("WhatsApp");
 
             return;
         }
-
-        // INSTAGRAM
 
         if (text.contains("instagram")) {
 
-            openApp(
-                    "com.instagram.android",
-                    "Instagram"
-            );
+            openAppByName("Instagram");
 
             return;
         }
 
-        // GMAIL
+        if (text.contains("snapchat")) {
+
+            openAppByName("Snapchat");
+
+            return;
+        }
+
+        if (text.contains("telegram")) {
+
+            openAppByName("Telegram");
+
+            return;
+        }
 
         if (text.contains("gmail")) {
 
-            openApp(
-                    "com.google.android.gm",
-                    "Gmail"
-            );
+            openAppByName("Gmail");
+
+            return;
+        }
+
+        if (text.contains("chrome")) {
+
+            openAppByName("Chrome");
 
             return;
         }
@@ -432,18 +469,6 @@ public class MainActivity extends Activity {
                 text.contains("setting")) {
 
             openSettings();
-
-            return;
-        }
-
-        // CHROME
-
-        if (text.contains("chrome")) {
-
-            openApp(
-                    "com.android.chrome",
-                    "Chrome"
-            );
 
             return;
         }
@@ -509,10 +534,6 @@ public class MainActivity extends Activity {
                     "JARVIS STOPPED"
             );
 
-            speak(
-                    "Okay sir. I am stopping."
-            );
-
             return;
         }
 
@@ -526,11 +547,10 @@ public class MainActivity extends Activity {
     }
 
     // ==============================
-    // OPEN APP
+    // OPEN APP BY NAME
     // ==============================
 
-    private void openApp(
-            String packageName,
+    private void openAppByName(
             String appName) {
 
         face.setState(
@@ -541,37 +561,22 @@ public class MainActivity extends Activity {
                 "⚡ ACTION"
         );
 
-        try {
+        boolean opened =
+                appLauncher.openApp(appName);
 
-            Intent intent =
-                    getPackageManager()
-                            .getLaunchIntentForPackage(
-                                    packageName
-                            );
-
-            if (intent != null) {
-
-                startActivity(intent);
-
-                speak(
-                        "Opening " +
-                                appName +
-                                ", sir."
-                );
-
-            } else {
-
-                speak(
-                        appName +
-                                " is not installed."
-                );
-            }
-
-        } catch (Exception e) {
+        if (opened) {
 
             speak(
-                    "Sorry sir, I could not open " +
-                            appName
+                    "Opening " +
+                            appName +
+                            ", sir."
+            );
+
+        } else {
+
+            speak(
+                    appName +
+                            " is not installed."
             );
         }
     }
@@ -643,9 +648,7 @@ public class MainActivity extends Activity {
 
         } catch (Exception e) {
 
-            openGoogleSearch(
-                    query
-            );
+            openGoogleSearch(query);
         }
     }
 
@@ -673,7 +676,8 @@ public class MainActivity extends Activity {
                     )
             );
 
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     private void openGoogle() {
