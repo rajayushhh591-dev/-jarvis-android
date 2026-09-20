@@ -35,7 +35,8 @@ public class JarvisFaceView extends View {
         post(animationLoop);
     }
 
-    public void setAvatarResource(int resourceId) {
+    public void setAvatarResource(
+            int resourceId) {
 
         try {
 
@@ -83,12 +84,17 @@ public class JarvisFaceView extends View {
             };
 
     @Override
-    protected void onDraw(Canvas canvas) {
+    protected void onDraw(
+            Canvas canvas) {
 
         super.onDraw(canvas);
 
         float width = getWidth();
         float height = getHeight();
+
+        if (width <= 0 || height <= 0) {
+            return;
+        }
 
         float cx = width / 2f;
         float cy = height / 2f;
@@ -96,9 +102,11 @@ public class JarvisFaceView extends View {
         float wave =
                 (float) Math.sin(animation);
 
-        if (avatarDrawable != null &&
-                width > 0 &&
-                height > 0) {
+        // -------------------------
+        // FACE
+        // -------------------------
+
+        if (avatarDrawable != null) {
 
             int drawableWidth =
                     avatarDrawable.getIntrinsicWidth();
@@ -117,8 +125,10 @@ public class JarvisFaceView extends View {
 
                 float scale =
                         Math.min(
-                                maxWidth / drawableWidth,
-                                maxHeight / drawableHeight
+                                maxWidth /
+                                        drawableWidth,
+                                maxHeight /
+                                        drawableHeight
                         );
 
                 float drawWidth =
@@ -139,19 +149,11 @@ public class JarvisFaceView extends View {
                 float bottom =
                         cy + drawHeight / 2f;
 
-                RectF rect =
-                        new RectF(
-                                left,
-                                top,
-                                right,
-                                bottom
-                        );
-
                 avatarDrawable.setBounds(
-                        (int) rect.left,
-                        (int) rect.top,
-                        (int) rect.right,
-                        (int) rect.bottom
+                        (int) left,
+                        (int) top,
+                        (int) right,
+                        (int) bottom
                 );
 
                 avatarDrawable.setAlpha(255);
@@ -160,13 +162,22 @@ public class JarvisFaceView extends View {
             }
         }
 
+        // -------------------------
+        // ANIMATION
+        // -------------------------
+
         float radius =
-                Math.min(width, height) * 0.38f;
+                Math.min(width, height)
+                        * 0.38f;
 
         if (state == IDLE) {
 
-            paint.setStyle(Paint.Style.STROKE);
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
             paint.setStrokeWidth(3);
+
             paint.setAlpha(120);
 
             canvas.drawCircle(
@@ -178,8 +189,12 @@ public class JarvisFaceView extends View {
 
         } else if (state == LISTENING) {
 
-            paint.setStyle(Paint.Style.STROKE);
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
             paint.setStrokeWidth(4);
+
             paint.setAlpha(220);
 
             for (int i = 0; i < 4; i++) {
@@ -200,7 +215,10 @@ public class JarvisFaceView extends View {
 
         } else if (state == THINKING) {
 
-            paint.setStyle(Paint.Style.FILL);
+            paint.setStyle(
+                    Paint.Style.FILL
+            );
+
             paint.setAlpha(230);
 
             for (int i = 0; i < 8; i++) {
@@ -233,8 +251,12 @@ public class JarvisFaceView extends View {
 
         } else if (state == ACTION) {
 
-            paint.setStyle(Paint.Style.STROKE);
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
             paint.setStrokeWidth(5);
+
             paint.setAlpha(230);
 
             float r =
@@ -262,8 +284,12 @@ public class JarvisFaceView extends View {
 
         } else if (state == SPEAKING) {
 
-            paint.setStyle(Paint.Style.STROKE);
+            paint.setStyle(
+                    Paint.Style.STROKE
+            );
+
             paint.setStrokeWidth(4);
+
             paint.setAlpha(230);
 
             float voiceWave =
@@ -298,9 +324,13 @@ public class JarvisFaceView extends View {
 
             canvas.drawOval(
                     cx - 45,
-                    cy + 95 - voiceWave / 2,
+                    cy + 95 -
+                            voiceWave / 2,
+
                     cx + 45,
-                    cy + 95 + voiceWave / 2,
+                    cy + 95 +
+                            voiceWave / 2,
+
                     paint
             );
         }
@@ -311,7 +341,9 @@ public class JarvisFaceView extends View {
     @Override
     protected void onDetachedFromWindow() {
 
-        removeCallbacks(animationLoop);
+        removeCallbacks(
+                animationLoop
+        );
 
         super.onDetachedFromWindow();
     }
