@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,96 +32,130 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private VoiceEngine voice;
+
     private TextToSpeech tts;
+
     private AppLauncher appLauncher;
 
     private JarvisFaceView face;
+
     private TextView status;
+
     private TextView output;
 
     private boolean running = false;
+
     private boolean ttsReady = false;
+
+    private boolean menuVisible = false;
 
     private static final int MIC_PERMISSION = 100;
 
-    private final Handler handler =
-            new Handler(Looper.getMainLooper());
+    private static final int CALL_PERMISSION = 101;
 
-    private final ArrayList<Integer> avatarResources =
+    private final Handler handler =
+            new Handler(
+                    Looper.getMainLooper()
+            );
+
+    private final ArrayList<Integer>
+            avatarResources =
             new ArrayList<>();
 
     private int selectedAvatar = 0;
 
     private SharedPreferences preferences;
 
-    private final Runnable longPressRunnable =
-            this::showAvatarPicker;
-
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(
+            Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
 
-        preferences = getSharedPreferences(
-                "JARVIS_SETTINGS",
-                MODE_PRIVATE
-        );
+        preferences =
+                getSharedPreferences(
+                        "JARVIS_SETTINGS",
+                        MODE_PRIVATE
+                );
 
-        appLauncher = new AppLauncher(this);
+        appLauncher =
+                new AppLauncher(this);
 
         loadAvatarResources();
+
         buildUI();
+
         initializeVoice();
+
         initializeTTS();
+
         requestMicrophone();
     }
 
-    // ---------------------------------------------------------
-    // AVATAR RESOURCES
-    // ---------------------------------------------------------
+    // =========================================================
+    // AVATAR
+    // =========================================================
 
     private void loadAvatarResources() {
 
         avatarResources.clear();
 
         String[] names = {
+
                 "jarvis_base_face",
+
                 "jarvis_body_1",
+
                 "jarvis_body_2",
+
                 "jarvis_body_3",
+
                 "jarvis_body_4",
+
                 "jarvis_body_5"
         };
 
         for (String name : names) {
 
-            int id = getResources().getIdentifier(
-                    name,
-                    "drawable",
-                    getPackageName()
-            );
+            int id =
+                    getResources()
+                            .getIdentifier(
+                                    name,
+                                    "drawable",
+                                    getPackageName()
+                            );
 
             if (id != 0) {
+
                 avatarResources.add(id);
             }
         }
 
         if (avatarResources.isEmpty()) {
-            avatarResources.add(android.R.drawable.ic_menu_gallery);
+
+            avatarResources.add(
+                    android.R.drawable
+                            .ic_menu_gallery
+            );
         }
 
-        selectedAvatar = preferences.getInt(
-                "selected_avatar",
-                0
-        );
+        selectedAvatar =
+                preferences.getInt(
+                        "selected_avatar",
+                        0
+                );
 
-        if (selectedAvatar >= avatarResources.size()) {
+        if (selectedAvatar < 0 ||
+                selectedAvatar >=
+                        avatarResources.size()) {
+
             selectedAvatar = 0;
         }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // UI
-    // ---------------------------------------------------------
+    // =========================================================
 
     private void buildUI() {
 
@@ -148,30 +181,38 @@ public class MainActivity extends Activity {
                 Color.BLACK
         );
 
-        face = new JarvisFaceView(this);
+        face =
+                new JarvisFaceView(this);
 
         face.setAvatarResource(
-                avatarResources.get(selectedAvatar)
+                avatarResources.get(
+                        selectedAvatar
+                )
         );
 
-        LinearLayout.LayoutParams faceParams =
+        LinearLayout.LayoutParams
+                faceParams =
                 new LinearLayout.LayoutParams(
-                       -1,
+                        -1,
                         0,
                         1f
                 );
-
-        faceParams.gravity =
-                Gravity.CENTER;
 
         root.addView(
                 face,
                 faceParams
         );
 
-        // 6-second long press
+        // -------------------------------------
+        // FACE TAP
+        // -------------------------------------
+
         face.setOnTouchListener(
                 new View.OnTouchListener() {
+
+                    private float downX;
+
+                    private float downY;
 
                     @Override
                     public boolean onTouch(
@@ -181,22 +222,35 @@ public class MainActivity extends Activity {
                         if (event.getAction() ==
                                 MotionEvent.ACTION_DOWN) {
 
-                            handler.postDelayed(
-                                    longPressRunnable,
-                                    6000
-                            );
+                            downX =
+                                    event.getX();
+
+                            downY =
+                                    event.getY();
 
                             return true;
                         }
 
                         if (event.getAction() ==
-                                MotionEvent.ACTION_UP ||
-                                event.getAction() ==
-                                        MotionEvent.ACTION_CANCEL) {
+                                MotionEvent.ACTION_UP) {
 
-                            handler.removeCallbacks(
-                                    longPressRunnable
-                            );
+                            float dx =
+                                    Math.abs(
+                                            event.getX()
+                                                    - downX
+                                    );
+
+                            float dy =
+                                    Math.abs(
+                                            event.getY()
+                                                    - downY
+                                    );
+
+                            if (dx < 30 &&
+                                    dy < 30) {
+
+                                toggleJarvisMenu();
+                            }
 
                             return true;
                         }
@@ -206,7 +260,12 @@ public class MainActivity extends Activity {
                 }
         );
 
-        status = new TextView(this);
+        // -------------------------------------
+        // STATUS
+        // -------------------------------------
+
+        status =
+                new TextView(this);
 
         status.setText(
                 "JARVIS STARTING..."
@@ -230,7 +289,12 @@ public class MainActivity extends Activity {
                 )
         );
 
-        output = new TextView(this);
+        // -------------------------------------
+        // OUTPUT
+        // -------------------------------------
+
+        output =
+                new TextView(this);
 
         output.setTextSize(17);
 
@@ -255,19 +319,124 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    // ---------------------------------------------------------
-    // AVATAR PICKER
-    // ---------------------------------------------------------
+    // =========================================================
+    // JARVIS MENU
+    // =========================================================
 
-    private void showAvatarPicker() {
+    private void toggleJarvisMenu() {
 
-        handler.removeCallbacks(
-                longPressRunnable
-        );
+        if (menuVisible) {
+
+            menuVisible = false;
+
+            face.setState(
+                    JarvisFaceView.IDLE
+            );
+
+            return;
+        }
+
+        menuVisible = true;
 
         face.setState(
                 JarvisFaceView.ACTION
         );
+
+        showJarvisMenu();
+    }
+
+    private void showJarvisMenu() {
+
+        String[] items = {
+
+                "Home",
+
+                "Chat",
+
+                "Voice",
+
+                "Face Selector",
+
+                "Settings",
+
+                "About"
+        };
+
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle(
+                                "JARVIS"
+                        )
+                        .setItems(
+                                items,
+                                (d, which) -> {
+
+                                    menuVisible =
+                                            false;
+
+                                    switch (which) {
+
+                                        case 0:
+
+                                            showHome();
+
+                                            break;
+
+                                        case 1:
+
+                                            showChat();
+
+                                            break;
+
+                                        case 2:
+
+                                            startVoiceMode();
+
+                                            break;
+
+                                        case 3:
+
+                                            showAvatarPicker();
+
+                                            break;
+
+                                        case 4:
+
+                                            openSettings();
+
+                                            break;
+
+                                        case 5:
+
+                                            showAbout();
+
+                                            break;
+                                    }
+                                }
+                        )
+                        .create();
+
+        dialog.setOnDismissListener(
+                d -> {
+
+                    menuVisible = false;
+
+                    face.setState(
+                            JarvisFaceView.IDLE
+                    );
+                }
+        );
+
+        dialog.show();
+    }
+
+    // =========================================================
+    // FACE SELECTOR
+    // =========================================================
+
+    private void showAvatarPicker() {
+
+        menuVisible = false;
 
         LinearLayout container =
                 new LinearLayout(this);
@@ -287,10 +456,10 @@ public class MainActivity extends Activity {
                 new TextView(this);
 
         title.setText(
-                "SELECT JARVIS AVATAR"
+                "SELECT JARVIS FACE"
         );
 
-        title.setTextSize(20);
+        title.setTextSize(21);
 
         title.setTextColor(
                 Color.WHITE
@@ -318,6 +487,17 @@ public class MainActivity extends Activity {
 
             final int index = i;
 
+            LinearLayout card =
+                    new LinearLayout(this);
+
+            card.setOrientation(
+                    LinearLayout.VERTICAL
+            );
+
+            card.setGravity(
+                    Gravity.CENTER
+            );
+
             ImageButton button =
                     new ImageButton(this);
 
@@ -326,45 +506,80 @@ public class MainActivity extends Activity {
             );
 
             button.setScaleType(
-                    android.widget.ImageView.ScaleType.CENTER_CROP
+                    android.widget.ImageView
+                            .ScaleType.CENTER_CROP
             );
 
             button.setBackgroundColor(
                     Color.TRANSPARENT
             );
 
-            LinearLayout.LayoutParams params =
+            LinearLayout.LayoutParams
+                    imageParams =
                     new LinearLayout.LayoutParams(
                             180,
                             180
                     );
 
-            params.setMargins(
+            button.setLayoutParams(
+                    imageParams
+            );
+
+            TextView label =
+                    new TextView(this);
+
+            label.setText(
+                    "Face " + (index + 1)
+            );
+
+            label.setTextColor(
+                    Color.WHITE
+            );
+
+            label.setGravity(
+                    Gravity.CENTER
+            );
+
+            card.addView(button);
+
+            card.addView(label);
+
+            LinearLayout.LayoutParams
+                    cardParams =
+                    new LinearLayout.LayoutParams(
+                            200,
+                            230
+                    );
+
+            cardParams.setMargins(
                     10,
-                    20,
                     10,
-                    20
+                    10,
+                    10
             );
 
             row.addView(
-                    button,
-                    params
+                    card,
+                    cardParams
             );
 
             button.setOnClickListener(
                     v -> {
 
-                        selectedAvatar = index;
+                        selectedAvatar =
+                                index;
 
                         preferences.edit()
                                 .putInt(
                                         "selected_avatar",
-                                        index
+                                        selectedAvatar
                                 )
                                 .apply();
 
                         face.setAvatarResource(
-                                avatarResources.get(index)
+                                avatarResources.get(
+                                        selectedAvatar
+                                )
                         );
 
                         face.setState(
@@ -373,12 +588,87 @@ public class MainActivity extends Activity {
 
                         Toast.makeText(
                                 this,
-                                "Avatar changed",
+                                "Face " +
+                                        (index + 1) +
+                                        " selected",
                                 Toast.LENGTH_SHORT
                         ).show();
+
+                        showHome();
                     }
             );
         }
+
+        // ADD MORE FACES
+
+        LinearLayout addCard =
+                new LinearLayout(this);
+
+        addCard.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        addCard.setGravity(
+                Gravity.CENTER
+        );
+
+        TextView addButton =
+                new TextView(this);
+
+        addButton.setText(
+                "+\nAdd More Faces"
+        );
+
+        addButton.setTextSize(18);
+
+        addButton.setTextColor(
+                Color.WHITE
+        );
+
+        addButton.setGravity(
+                Gravity.CENTER
+        );
+
+        addButton.setPadding(
+                20,
+                20,
+                20,
+                20
+        );
+
+        addCard.addView(
+                addButton
+        );
+
+        LinearLayout.LayoutParams
+                addParams =
+                new LinearLayout.LayoutParams(
+                        200,
+                        180
+                );
+
+        addParams.setMargins(
+                10,
+                10,
+                10,
+                10
+        );
+
+        row.addView(
+                addCard,
+                addParams
+        );
+
+        addButton.setOnClickListener(
+                v -> {
+
+                    Toast.makeText(
+                            this,
+                            "Add your new face image to res/drawable, then add its name in loadAvatarResources().",
+                            Toast.LENGTH_LONG
+                    ).show();
+                }
+        );
 
         scroll.addView(row);
 
@@ -395,170 +685,262 @@ public class MainActivity extends Activity {
 
         dialog.show();
 
-        dialog.getWindow()
-                .setDimAmount(0.85f);
+        if (dialog.getWindow() != null) {
+
+            dialog.getWindow()
+                    .setDimAmount(0.85f);
+        }
     }
 
-    // ---------------------------------------------------------
-    // VOICE
-    // ---------------------------------------------------------
+    // =========================================================
+    // HOME / CHAT / VOICE / ABOUT
+    // =========================================================
 
-    private void initializeVoice() {
+    private void showHome() {
 
-        voice = new VoiceEngine(
-                this,
-                new VoiceEngine.Listener() {
+        output.setText(
+                "JARVIS HOME"
+        );
 
-                    @Override
-                    public void onListening() {
+        status.setText(
+                "READY"
+        );
 
-                        runOnUiThread(() -> {
-
-                            face.setState(
-                                    JarvisFaceView.LISTENING
-                            );
-
-                            status.setText(
-                                    "🎤 LISTENING"
-                            );
-                        });
-                    }
-
-                    @Override
-                    public void onResult(
-                            String text) {
-
-                        runOnUiThread(() -> {
-
-                            face.setState(
-                                    JarvisFaceView.THINKING
-                            );
-
-                            status.setText(
-                                    "🧠 PROCESSING"
-                            );
-
-                            output.setText(
-                                    "YOU: " + text
-                            );
-
-                            handleCommand(text);
-                        });
-                    }
-
-                    @Override
-                    public void onError(
-                            String error) {
-
-                        if (!running) {
-                            return;
-                        }
-
-                        runOnUiThread(() -> {
-
-                            status.setText(
-                                    "🎤 LISTENING"
-                            );
-
-                            face.setState(
-                                    JarvisFaceView.LISTENING
-                            );
-                        });
-                    }
-                }
+        face.setState(
+                JarvisFaceView.IDLE
         );
     }
 
-    // ---------------------------------------------------------
-    // TTS
-    // ---------------------------------------------------------
+    private void showChat() {
 
-    private void initializeTTS() {
+        output.setText(
+                "JARVIS CHAT"
+        );
 
-        tts = new TextToSpeech(
-                this,
-                result -> {
+        status.setText(
+                "CHAT MODE"
+        );
 
-                    if (result ==
-                            TextToSpeech.SUCCESS) {
+        face.setState(
+                JarvisFaceView.IDLE
+        );
+    }
 
-                        ttsReady = true;
+    private void startVoiceMode() {
 
-                        tts.setSpeechRate(
-                                0.95f
-                        );
+        running = true;
 
-                        tts.setPitch(
-                                1.0f
-                        );
+        status.setText(
+                "🎤 LISTENING"
+        );
 
-                        tts.setOnUtteranceProgressListener(
-                                new UtteranceProgressListener() {
+        face.setState(
+                JarvisFaceView.LISTENING
+        );
 
-                                    @Override
-                                    public void onStart(
-                                            String id) {
+        voice.start();
+    }
 
-                                        runOnUiThread(() -> {
+    private void showAbout() {
+
+        new AlertDialog.Builder(this)
+                .setTitle(
+                        "JARVIS"
+                )
+                .setMessage(
+                        "JARVIS Personal Assistant\n\n" +
+                        "Custom voice assistant with " +
+                        "selectable JARVIS faces."
+                )
+                .setPositiveButton(
+                        "CLOSE",
+                        null
+                )
+                .show();
+    }
+
+    // =========================================================
+    // VOICE
+    // =========================================================
+
+    private void initializeVoice() {
+
+        voice =
+                new VoiceEngine(
+                        this,
+                        new VoiceEngine.Listener() {
+
+                            @Override
+                            public void onListening() {
+
+                                runOnUiThread(
+                                        () -> {
 
                                             face.setState(
-                                                    JarvisFaceView.SPEAKING
-                                            );
-
-                                            status.setText(
-                                                    "🔊 SPEAKING"
-                                            );
-                                        });
-                                    }
-
-                                    @Override
-                                    public void onDone(
-                                            String id) {
-
-                                        if (!running) {
-                                            return;
-                                        }
-
-                                        runOnUiThread(() -> {
-
-                                            face.setState(
-                                                    JarvisFaceView.LISTENING
+                                                    JarvisFaceView
+                                                            .LISTENING
                                             );
 
                                             status.setText(
                                                     "🎤 LISTENING"
                                             );
+                                        }
+                                );
+                            }
 
-                                            voice.start();
-                                        });
-                                    }
+                            @Override
+                            public void onResult(
+                                    String text) {
 
-                                    @Override
-                                    public void onError(
-                                            String id) {
+                                runOnUiThread(
+                                        () -> {
 
-                                        if (running) {
-                                            runOnUiThread(() ->
-                                                    voice.start()
+                                            face.setState(
+                                                    JarvisFaceView
+                                                            .THINKING
+                                            );
+
+                                            status.setText(
+                                                    "🧠 PROCESSING"
+                                            );
+
+                                            output.setText(
+                                                    "YOU: " +
+                                                            text
+                                            );
+
+                                            handleCommand(
+                                                    text
                                             );
                                         }
-                                    }
+                                );
+                            }
+
+                            @Override
+                            public void onError(
+                                    String error) {
+
+                                if (!running) {
+                                    return;
                                 }
-                        );
 
-                        running = true;
+                                runOnUiThread(
+                                        () -> {
 
-                        speak(
-                                "Hello sir, I am Jarvis."
-                        );
-                    }
-                }
-        );
+                                            status.setText(
+                                                    "🎤 LISTENING"
+                                            );
+
+                                            face.setState(
+                                                    JarvisFaceView
+                                                            .LISTENING
+                                            );
+                                        }
+                                );
+                            }
+                        }
+                );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
+    // TTS
+    // =========================================================
+
+    private void initializeTTS() {
+
+        tts =
+                new TextToSpeech(
+                        this,
+                        result -> {
+
+                            if (result ==
+                                    TextToSpeech.SUCCESS) {
+
+                                ttsReady = true;
+
+                                tts.setSpeechRate(
+                                        0.95f
+                                );
+
+                                tts.setPitch(
+                                        1.0f
+                                );
+
+                                tts.setOnUtteranceProgressListener(
+                                        new UtteranceProgressListener() {
+
+                                            @Override
+                                            public void onStart(
+                                                    String id) {
+
+                                                runOnUiThread(
+                                                        () -> {
+
+                                                            face.setState(
+                                                                    JarvisFaceView
+                                                                            .SPEAKING
+                                                            );
+
+                                                            status.setText(
+                                                                    "🔊 SPEAKING"
+                                                            );
+                                                        }
+                                                );
+                                            }
+
+                                            @Override
+                                            public void onDone(
+                                                    String id) {
+
+                                                if (!running) {
+                                                    return;
+                                                }
+
+                                                runOnUiThread(
+                                                        () -> {
+
+                                                            face.setState(
+                                                                    JarvisFaceView
+                                                                            .LISTENING
+                                                            );
+
+                                                            status.setText(
+                                                                    "🎤 LISTENING"
+                                                            );
+
+                                                            voice.start();
+                                                        }
+                                                );
+                                            }
+
+                                            @Override
+                                            public void onError(
+                                                    String id) {
+
+                                                if (running) {
+
+                                                    runOnUiThread(
+                                                            () ->
+                                                                    voice.start()
+                                                    );
+                                                }
+                                            }
+                                        }
+                                );
+
+                                running = true;
+
+                                speak(
+                                        "Hello sir, I am Jarvis."
+                                );
+                            }
+                        }
+                );
+    }
+
+    // =========================================================
     // MICROPHONE
-    // ---------------------------------------------------------
+    // =========================================================
 
     private void requestMicrophone() {
 
@@ -584,6 +966,7 @@ public class MainActivity extends Activity {
         running = true;
 
         if (ttsReady) {
+
             voice.start();
         }
     }
@@ -605,7 +988,8 @@ public class MainActivity extends Activity {
 
             if (results.length > 0 &&
                     results[0] ==
-                            PackageManager.PERMISSION_GRANTED) {
+                            PackageManager
+                                    .PERMISSION_GRANTED) {
 
                 startJarvis();
 
@@ -615,49 +999,66 @@ public class MainActivity extends Activity {
                         "Microphone permission required"
                 );
             }
+
+            return;
+        }
+
+        if (requestCode ==
+                CALL_PERMISSION) {
+
+            if (results.length > 0 &&
+                    results[0] ==
+                            PackageManager
+                                    .PERMISSION_GRANTED) {
+
+                String number =
+                        preferences.getString(
+                                "pending_call_number",
+                                ""
+                        );
+
+                if (!number.isEmpty()) {
+
+                    preferences.edit()
+                            .remove(
+                                    "pending_call_number"
+                            )
+                            .apply();
+
+                    makePhoneCall(number);
+                }
+
+            } else {
+
+                speak(
+                        "Phone permission was not allowed, sir."
+                );
+            }
         }
     }
 
-    // ---------------------------------------------------------
-    // COMMAND PROCESSING
-    // ---------------------------------------------------------
+    // =========================================================
+    // COMMANDS
+    // =========================================================
 
     private void handleCommand(
             String original) {
+
+        if (original == null) {
+            return;
+        }
 
         String text =
                 original
                         .toLowerCase(Locale.ROOT)
                         .trim();
 
-        // HELLO
-        if (text.contains("hello") ||
-                text.contains("hi jarvis") ||
-                text.equals("hi") ||
-                text.contains("नमस्ते") ||
-                text.contains("हेलो")) {
-
-            speak(
-                    "Hello sir, how can I help you?"
-            );
-
-            return;
-        }
-
-        // NAME
-        if (text.contains("your name") ||
-                text.contains("who are you") ||
-                text.contains("tumhara naam") ||
-                text.contains("आपका नाम")) {
-
-            speak(
-                    "I am Jarvis, your personal assistant."
-            );
-
+        if (text.isEmpty()) {
             return;
         }
 
         // STOP
+
         if (text.equals("stop") ||
                 text.contains("stop listening") ||
                 text.contains("रुक जाओ") ||
@@ -678,34 +1079,75 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // YOUTUBE
-        if (text.contains("youtube") ||
-                text.contains("youtube par") ||
-                text.contains("youtube pe")) {
+        // HELLO
 
-            String query =
-                    extractYouTubeQuery(text);
-
-            openYouTube(query);
+        if (text.contains("hello") ||
+                text.contains("hi jarvis") ||
+                text.equals("hi") ||
+                text.contains("नमस्ते") ||
+                text.contains("हेलो")) {
 
             speak(
-                    "Opening YouTube, sir."
+                    "Hello sir, how can I help you?"
             );
 
             return;
         }
 
-        // DIALER
+        // NAME
+
+        if (text.contains("your name") ||
+                text.contains("who are you") ||
+                text.contains("tumhara naam") ||
+                text.contains("आपका नाम")) {
+
+            speak(
+                    "I am Jarvis, your personal assistant."
+            );
+
+            return;
+        }
+
+        // HOW ARE YOU
+
+        if (text.contains("how are you") ||
+                text.contains("kaise ho") ||
+                text.contains("कैसे हो")) {
+
+            speak(
+                    "I am doing great, sir. I am ready to help you."
+            );
+
+            return;
+        }
+
+        // WHAT ARE YOU DOING
+
+        if (text.contains("what are you doing") ||
+                text.contains("kya kar rahe ho") ||
+                text.contains("क्या कर रहे हो")) {
+
+            speak(
+                    "I am listening and waiting for your command, sir."
+            );
+
+            return;
+        }
+
+        // CALL
+
         if (text.contains("call") ||
                 text.contains("dial") ||
                 text.contains("phone")) {
 
             String number =
-                    extractPhoneNumber(original);
+                    extractPhoneNumber(
+                            original
+                    );
 
             if (!number.isEmpty()) {
 
-                openDialer(number);
+                makePhoneCall(number);
 
             } else {
 
@@ -718,6 +1160,7 @@ public class MainActivity extends Activity {
         }
 
         // CAMERA
+
         if (text.contains("camera") ||
                 text.contains("कैमरा")) {
 
@@ -727,6 +1170,7 @@ public class MainActivity extends Activity {
         }
 
         // SETTINGS
+
         if (text.contains("settings") ||
                 text.contains("setting") ||
                 text.contains("सेटिंग")) {
@@ -736,136 +1180,211 @@ public class MainActivity extends Activity {
             return;
         }
 
+        // YOUTUBE
+
+        if (text.contains("youtube")) {
+
+            String query =
+                    extractYouTubeQuery(
+                            text
+                    );
+
+            openYouTube(query);
+
+            return;
+        }
+
         // GOOGLE
+
         if (text.equals("open google") ||
                 text.contains("google kholo") ||
                 text.contains("google खोलो")) {
 
             openGoogle();
 
-            speak(
-                    "Opening Google, sir."
-            );
-
             return;
         }
 
-        // EXPLICIT OPEN COMMAND
+        // EXPLICIT OPEN
+
         if (text.startsWith("open ")) {
 
             String appName =
-                    original.substring(5).trim();
+                    original
+                            .substring(5)
+                            .trim();
 
             if (!appName.isEmpty()) {
 
-                openAppByName(appName);
+                openAppByName(
+                        appName
+                );
             }
 
             return;
         }
 
         // COMMON APPS
+
         if (text.contains("whatsapp")) {
 
-            openAppByName("WhatsApp");
+            openAppByName(
+                    "WhatsApp"
+            );
 
             return;
         }
 
         if (text.contains("instagram")) {
 
-            openAppByName("Instagram");
+            openAppByName(
+                    "Instagram"
+            );
 
             return;
         }
 
         if (text.contains("snapchat")) {
 
-            openAppByName("Snapchat");
+            openAppByName(
+                    "Snapchat"
+            );
 
             return;
         }
 
         if (text.contains("telegram")) {
 
-            openAppByName("Telegram");
+            openAppByName(
+                    "Telegram"
+            );
 
             return;
         }
 
         if (text.contains("gmail")) {
 
-            openAppByName("Gmail");
+            openAppByName(
+                    "Gmail"
+            );
 
             return;
         }
 
-        if (text.contains("chrome")) {
-
-            openAppByName("Chrome");
-
-            return;
-        }
-
-        // SEARCH COMMAND
-        if (text.startsWith("search ") ||
-                text.contains("google par search") ||
-                text.contains("search karo")) {
-
-            String query =
-                    text.replace(
-                            "google par search",
-                            ""
-                    )
-                    .replace(
-                            "search karo",
-                            ""
-                    )
-                    .replace(
-                            "search",
-                            ""
-                    )
-                    .trim();
-
-            if (!query.isEmpty()) {
-
-                openGoogleSearch(query);
-
-                speak(
-                        "Searching for " +
-                                query +
-                                ", sir."
-                );
-
-            } else {
-
-                speak(
-                        "What should I search for, sir?"
-                );
-            }
-
-            return;
-        }
+        // UNKNOWN COMMAND
 
         speak(
-                "Sorry sir, I did not understand that command."
+                "I heard you, sir, but I do not have an action for that yet."
         );
     }
 
-    // ---------------------------------------------------------
-    // APP OPENING
-    // ---------------------------------------------------------
+    // =========================================================
+    // PHONE NUMBER
+    // =========================================================
+
+    private String extractPhoneNumber(
+            String text) {
+
+        if (text == null) {
+            return "";
+        }
+
+        String number =
+                text.replaceAll(
+                        "[^0-9+]",
+                        ""
+                );
+
+        if (number.startsWith("91") &&
+                number.length() == 12) {
+
+            number =
+                    "+" + number;
+        }
+
+        if (number.startsWith("0") &&
+                number.length() == 11) {
+
+            number =
+                    "+91" +
+                            number.substring(1);
+        }
+
+        if (number.length() >= 10) {
+
+            return number;
+        }
+
+        return "";
+    }
+
+    // =========================================================
+    // DIRECT CALL
+    // =========================================================
+
+    private void makePhoneCall(
+            String number) {
+
+        if (number == null ||
+                number.trim().isEmpty()) {
+
+            speak(
+                    "I could not understand the number, sir."
+            );
+
+            return;
+        }
+
+        if (checkSelfPermission(
+                Manifest.permission.CALL_PHONE
+        ) != PackageManager.PERMISSION_GRANTED) {
+
+            preferences.edit()
+                    .putString(
+                            "pending_call_number",
+                            number
+                    )
+                    .apply();
+
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.CALL_PHONE
+                    },
+                    CALL_PERMISSION
+            );
+
+            return;
+        }
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Intent.ACTION_CALL
+                    );
+
+            intent.setData(
+                    Uri.parse(
+                            "tel:" + number
+                    )
+            );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            speak(
+                    "Sorry sir, I could not make the call."
+            );
+        }
+    }
+
+    // =========================================================
+    // APP
+    // =========================================================
 
     private void openAppByName(
             String appName) {
-
-        face.setState(
-                JarvisFaceView.ACTION
-        );
-
-        status.setText(
-                "⚡ ACTION"
-        );
 
         boolean opened =
                 appLauncher.openApp(
@@ -874,216 +1393,38 @@ public class MainActivity extends Activity {
 
         if (opened) {
 
-            speak(
-                    "Opening " +
-                            appName +
-                            ", sir."
+            status.setText(
+                    "OPENED"
+            );
+
+            face.setState(
+                    JarvisFaceView.ACTION
             );
 
         } else {
 
             speak(
-                    appName +
-                            " is not installed."
+                    "I could not find " +
+                            appName +
+                            " on this phone."
             );
         }
     }
 
-    // ---------------------------------------------------------
-    // DIALER
-    // ---------------------------------------------------------
-
-    private void openDialer(
-            String phoneNumber) {
-
-        face.setState(
-                JarvisFaceView.ACTION
-        );
-
-        status.setText(
-                "⚡ CALL"
-        );
-
-        try {
-
-            Intent intent =
-                    new Intent(
-                            Intent.ACTION_DIAL,
-                            Uri.parse(
-                                    "tel:" +
-                                            phoneNumber
-                            )
-                    );
-
-            startActivity(intent);
-
-            speak(
-                    "Opening dialer, sir."
-            );
-
-        } catch (Exception e) {
-
-            speak(
-                    "Sorry sir, I could not open the dialer."
-            );
-        }
-    }
-
-    private String extractPhoneNumber(
-            String text) {
-
-        StringBuilder number =
-                new StringBuilder();
-
-        for (int i = 0;
-             i < text.length();
-             i++) {
-
-            char c =
-                    text.charAt(i);
-
-            if (Character.isDigit(c) ||
-                    (c == '+' &&
-                            number.length() == 0)) {
-
-                number.append(c);
-            }
-        }
-
-        return number.toString();
-    }
-
-    // ---------------------------------------------------------
-    // YOUTUBE
-    // ---------------------------------------------------------
-
-    private String extractYouTubeQuery(
-            String text) {
-
-        String query = text;
-
-        String[] words = {
-                "play",
-                "youtube",
-                "on youtube",
-                "youtube par",
-                "youtube pe",
-                "song",
-                "gana",
-                "gाना",
-                "chalao",
-                "chala",
-                "bajao",
-                "baja do",
-                "open",
-                "please"
-        };
-
-        for (String word : words) {
-
-            query =
-                    query.replace(
-                            word,
-                            ""
-                    );
-        }
-
-        query = query.trim();
-
-        if (query.isEmpty()) {
-
-            query =
-                    "Arijit Singh songs";
-        }
-
-        return query;
-    }
-
-    private void openYouTube(
-            String query) {
-
-        try {
-
-            String url =
-                    "https://www.youtube.com/results?search_query=" +
-                            URLEncoder.encode(
-                                    query,
-                                    "UTF-8"
-                            );
-
-            startActivity(
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(url)
-                    )
-            );
-
-        } catch (Exception e) {
-
-            openGoogleSearch(query);
-        }
-    }
-
-    // ---------------------------------------------------------
-    // GOOGLE
-    // ---------------------------------------------------------
-
-    private void openGoogleSearch(
-            String query) {
-
-        try {
-
-            String url =
-                    "https://www.google.com/search?q=" +
-                            URLEncoder.encode(
-                                    query,
-                                    "UTF-8"
-                            );
-
-            startActivity(
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(url)
-                    )
-            );
-
-        } catch (Exception ignored) {}
-    }
-
-    private void openGoogle() {
-
-        try {
-
-            startActivity(
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(
-                                    "https://www.google.com"
-                            )
-                    )
-            );
-
-        } catch (Exception e) {
-
-            speak(
-                    "Google could not be opened."
-            );
-        }
-    }
-
-    // ---------------------------------------------------------
+    // =========================================================
     // CAMERA
-    // ---------------------------------------------------------
+    // =========================================================
 
     private void openCamera() {
 
         try {
 
-            startActivity(
+            Intent intent =
                     new Intent(
                             "android.media.action.IMAGE_CAPTURE"
-                    )
-            );
+                    );
+
+            startActivity(intent);
 
             speak(
                     "Opening camera, sir."
@@ -1092,24 +1433,25 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
 
             speak(
-                    "Camera could not be opened."
+                    "I could not open the camera, sir."
             );
         }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // SETTINGS
-    // ---------------------------------------------------------
+    // =========================================================
 
     private void openSettings() {
 
         try {
 
-            startActivity(
+            Intent intent =
                     new Intent(
                             Settings.ACTION_SETTINGS
-                    )
-            );
+                    );
+
+            startActivity(intent);
 
             speak(
                     "Opening settings, sir."
@@ -1123,17 +1465,154 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
+    // GOOGLE
+    // =========================================================
+
+    private void openGoogle() {
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(
+                                    "https://www.google.com"
+                            )
+                    );
+
+            startActivity(intent);
+
+            speak(
+                    "Opening Google, sir."
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open Google."
+            );
+        }
+    }
+
+    // =========================================================
+    // YOUTUBE
+    // =========================================================
+
+    private String extractYouTubeQuery(
+            String text) {
+
+        if (text == null) {
+            return "";
+        }
+
+        String query = text;
+
+        query =
+                query.replace(
+                        "open youtube",
+                        ""
+                );
+
+        query =
+                query.replace(
+                        "youtube par",
+                        ""
+                );
+
+        query =
+                query.replace(
+                        "youtube pe",
+                        ""
+                );
+
+        query =
+                query.replace(
+                        "youtube",
+                        ""
+                );
+
+        query =
+                query.trim();
+
+        return query;
+    }
+
+    private void openYouTube(
+            String query) {
+
+        try {
+
+            if (query == null ||
+                    query.trim().isEmpty()) {
+
+                Intent intent =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                        "https://www.youtube.com"
+                                )
+                        );
+
+                startActivity(intent);
+
+            } else {
+
+                String encoded =
+                        URLEncoder.encode(
+                                query,
+                                "UTF-8"
+                        );
+
+                Intent intent =
+                        new Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                        "https://www.youtube.com/results?search_query=" +
+                                                encoded
+                                )
+                        );
+
+                startActivity(intent);
+            }
+
+            speak(
+                    "Opening YouTube, sir."
+            );
+
+        } catch (Exception e) {
+
+            speak(
+                    "I could not open YouTube."
+            );
+        }
+    }
+
+    // =========================================================
     // SPEAK
-    // ---------------------------------------------------------
+    // =========================================================
 
     private void speak(
-            String message) {
+            String text) {
+
+        if (text == null ||
+                text.trim().isEmpty()) {
+
+            return;
+        }
 
         output.setText(
-                "JARVIS: " +
-                        message
+                "JARVIS: " + text
         );
+
+        if (!ttsReady) {
+
+            status.setText(
+                    "JARVIS"
+            );
+
+            return;
+        }
 
         face.setState(
                 JarvisFaceView.SPEAKING
@@ -1143,70 +1622,42 @@ public class MainActivity extends Activity {
                 "🔊 SPEAKING"
         );
 
-        if (tts == null ||
-                !ttsReady) {
-
-            return;
-        }
-
-        boolean hindi =
-                message.matches(
-                        ".*[\\u0900-\\u097F].*"
-                );
-
-        try {
-
-            if (hindi) {
-
-                tts.setLanguage(
-                        new Locale(
-                                "hi",
-                                "IN"
-                        )
-                );
-
-            } else {
-
-                tts.setLanguage(
-                        Locale.US
-                );
-            }
-
-        } catch (Exception ignored) {}
+        String utteranceId =
+                "JARVIS_" +
+                        System.currentTimeMillis();
 
         tts.speak(
-                message,
+                text,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
-                "JARVIS_" +
-                        System.currentTimeMillis()
+                utteranceId
         );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // DESTROY
-    // ---------------------------------------------------------
+    // =========================================================
 
     @Override
     protected void onDestroy() {
 
         running = false;
 
-        handler.removeCallbacksAndMessages(
-                null
-        );
-
         if (voice != null) {
 
-            voice.stop();
             voice.destroy();
         }
 
         if (tts != null) {
 
             tts.stop();
+
             tts.shutdown();
         }
+
+        handler.removeCallbacksAndMessages(
+                null
+        );
 
         super.onDestroy();
     }
