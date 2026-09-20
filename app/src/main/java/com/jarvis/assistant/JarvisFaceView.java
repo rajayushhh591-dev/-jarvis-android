@@ -19,50 +19,44 @@ public class JarvisFaceView extends View {
     private final Paint paint =
             new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private Bitmap faceBitmap;
+    private Bitmap avatarBitmap;
 
     private int state = IDLE;
 
     private float animation = 0f;
 
-    public JarvisFaceView(Context context) {
+    public JarvisFaceView(
+            Context context) {
 
         super(context);
 
-        setBackgroundColor(0xFF000000);
+        setBackgroundColor(
+                0xFF000000
+        );
 
         paint.setAntiAlias(true);
-
-        faceBitmap = BitmapFactory.decodeResource(
-                getResources(),
-                getResources().getIdentifier(
-                        "jarvis_base_face",
-                        "drawable",
-                        context.getPackageName()
-                )
-        );
 
         post(animationLoop);
     }
 
-    private final Runnable animationLoop =
-            new Runnable() {
+    public void setAvatarResource(
+            int resourceId) {
 
-        @Override
-        public void run() {
+        Bitmap bitmap =
+                BitmapFactory.decodeResource(
+                        getResources(),
+                        resourceId
+                );
 
-            animation += 0.10f;
-
-            invalidate();
-
-            postDelayed(
-                    this,
-                    30
-            );
+        if (bitmap != null) {
+            avatarBitmap = bitmap;
         }
-    };
 
-    public void setState(int newState) {
+        invalidate();
+    }
+
+    public void setState(
+            int newState) {
 
         state = newState;
 
@@ -70,12 +64,29 @@ public class JarvisFaceView extends View {
     }
 
     public int getState() {
-
         return state;
     }
 
+    private final Runnable animationLoop =
+            new Runnable() {
+
+                @Override
+                public void run() {
+
+                    animation += 0.08f;
+
+                    invalidate();
+
+                    postDelayed(
+                            this,
+                            30
+                    );
+                }
+            };
+
     @Override
-    protected void onDraw(Canvas canvas) {
+    protected void onDraw(
+            Canvas canvas) {
 
         super.onDraw(canvas);
 
@@ -86,35 +97,34 @@ public class JarvisFaceView extends View {
                 getHeight() / 2f;
 
         float wave =
-                (float) Math.sin(animation);
+                (float) Math.sin(
+                        animation
+                );
 
-        // =====================================
-        // JARVIS FACE IMAGE
-        // =====================================
-
-        if (faceBitmap != null) {
+        // Avatar
+        if (avatarBitmap != null) {
 
             float maxWidth =
-                    getWidth() * 0.82f;
+                    getWidth() * 0.86f;
 
             float maxHeight =
-                    getHeight() * 0.72f;
+                    getHeight() * 0.82f;
 
             float scale =
                     Math.min(
                             maxWidth /
-                                    faceBitmap.getWidth(),
+                                    avatarBitmap.getWidth(),
 
                             maxHeight /
-                                    faceBitmap.getHeight()
+                                    avatarBitmap.getHeight()
                     );
 
             float width =
-                    faceBitmap.getWidth()
+                    avatarBitmap.getWidth()
                             * scale;
 
             float height =
-                    faceBitmap.getHeight()
+                    avatarBitmap.getHeight()
                             * scale;
 
             RectF destination =
@@ -132,26 +142,18 @@ public class JarvisFaceView extends View {
             paint.setAlpha(255);
 
             canvas.drawBitmap(
-                    faceBitmap,
+                    avatarBitmap,
                     null,
                     destination,
                     paint
             );
         }
 
-        // =====================================
-        // ANIMATION RADIUS
-        // =====================================
-
         float radius =
                 Math.min(
                         getWidth(),
                         getHeight()
                 ) * 0.38f;
-
-        // =====================================
-        // IDLE
-        // =====================================
 
         if (state == IDLE) {
 
@@ -166,14 +168,11 @@ public class JarvisFaceView extends View {
             canvas.drawCircle(
                     cx,
                     cy,
-                    radius + wave * 4,
+                    radius +
+                            wave * 4,
                     paint
             );
         }
-
-        // =====================================
-        // LISTENING
-        // =====================================
 
         else if (state == LISTENING) {
 
@@ -185,26 +184,24 @@ public class JarvisFaceView extends View {
 
             paint.setAlpha(220);
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0;
+                 i < 4;
+                 i++) {
 
-                float listeningRadius =
-                        radius
-                                + 20
-                                + i * 22
-                                + wave * 8;
+                float r =
+                        radius +
+                                20 +
+                                i * 22 +
+                                wave * 8;
 
                 canvas.drawCircle(
                         cx,
                         cy,
-                        listeningRadius,
+                        r,
                         paint
                 );
             }
         }
-
-        // =====================================
-        // THINKING
-        // =====================================
 
         else if (state == THINKING) {
 
@@ -214,38 +211,46 @@ public class JarvisFaceView extends View {
 
             paint.setAlpha(230);
 
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0;
+                 i < 8;
+                 i++) {
 
                 double angle =
-                        animation
-                                + i * Math.PI / 4;
+                        animation +
+                                i *
+                                Math.PI /
+                                4;
 
                 float x =
                         cx +
-                        (float) Math.cos(angle)
-                                * (radius + 35);
+                                (float)
+                                        Math.cos(
+                                                angle
+                                        ) *
+                                        (radius + 35);
 
                 float y =
                         cy +
-                        (float) Math.sin(angle)
-                                * (radius + 35);
+                                (float)
+                                        Math.sin(
+                                                angle
+                                        ) *
+                                        (radius + 35);
 
-                float dotSize =
+                float size =
                         5 +
-                        Math.abs(wave) * 4;
+                                Math.abs(
+                                        wave
+                                ) * 4;
 
                 canvas.drawCircle(
                         x,
                         y,
-                        dotSize,
+                        size,
                         paint
                 );
             }
         }
-
-        // =====================================
-        // ACTION
-        // =====================================
 
         else if (state == ACTION) {
 
@@ -257,15 +262,15 @@ public class JarvisFaceView extends View {
 
             paint.setAlpha(230);
 
-            float actionRadius =
-                    radius
-                            + 40
-                            + wave * 18;
+            float r =
+                    radius +
+                            40 +
+                            wave * 18;
 
             canvas.drawCircle(
                     cx,
                     cy,
-                    actionRadius,
+                    r,
                     paint
             );
 
@@ -274,14 +279,12 @@ public class JarvisFaceView extends View {
             canvas.drawCircle(
                     cx,
                     cy,
-                    radius + 65 - wave * 12,
+                    radius +
+                            65 -
+                            wave * 12,
                     paint
             );
         }
-
-        // =====================================
-        // SPEAKING
-        // =====================================
 
         else if (state == SPEAKING) {
 
@@ -295,9 +298,9 @@ public class JarvisFaceView extends View {
 
             float voiceWave =
                     20 +
-                    Math.abs(wave) * 35;
-
-            // Left voice wave
+                            Math.abs(
+                                    wave
+                            ) * 35;
 
             canvas.drawArc(
                     new RectF(
@@ -312,8 +315,6 @@ public class JarvisFaceView extends View {
                     paint
             );
 
-            // Right voice wave
-
             canvas.drawArc(
                     new RectF(
                             cx + 35,
@@ -327,13 +328,13 @@ public class JarvisFaceView extends View {
                     paint
             );
 
-            // Speaking pulse
-
             canvas.drawOval(
                     cx - 45,
-                    cy + 95 - voiceWave / 2,
+                    cy + 95 -
+                            voiceWave / 2,
                     cx + 45,
-                    cy + 95 + voiceWave / 2,
+                    cy + 95 +
+                            voiceWave / 2,
                     paint
             );
         }
@@ -344,7 +345,9 @@ public class JarvisFaceView extends View {
     @Override
     protected void onDetachedFromWindow() {
 
-        removeCallbacks(animationLoop);
+        removeCallbacks(
+                animationLoop
+        );
 
         super.onDetachedFromWindow();
     }
