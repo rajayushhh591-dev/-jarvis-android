@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Microphone Permission -->
     <uses-permission
         android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Internet Permission -->
     <uses-permission
         android:name="android.permission.INTERNET" />
 
-    <!-- Allow JARVIS to discover installed launcher apps -->
     <queries>
+
         <intent>
             <action
                 android:name="android.intent.action.MAIN" />
@@ -19,6 +18,17 @@
             <category
                 android:name="android.intent.category.LAUNCHER" />
         </intent>
+
+        <intent>
+            <action
+                android:name="android.intent.action.DIAL" />
+        </intent>
+
+        <intent>
+            <action
+                android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+
     </queries>
 
     <application
