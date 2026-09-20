@@ -2,10 +2,10 @@ package com.jarvis.assistant;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -15,100 +15,119 @@ public class AppLauncher {
     private final PackageManager packageManager;
 
     public AppLauncher(Context context) {
+
         this.context = context;
-        this.packageManager = context.getPackageManager();
+        this.packageManager =
+                context.getPackageManager();
     }
 
-    public boolean openApp(String appName) {
+    public boolean openApp(
+            String appName) {
 
-        if (appName == null || appName.trim().isEmpty()) {
+        if (appName == null ||
+                appName.trim().isEmpty()) {
+
             return false;
         }
 
-        String wanted = appName.trim().toLowerCase(Locale.ROOT);
-
-        Intent launcherIntent = new Intent(
-                Intent.ACTION_MAIN,
-                null
-        );
-
-        launcherIntent.addCategory(
-                Intent.CATEGORY_LAUNCHER
-        );
+        String wanted =
+                normalize(appName);
 
         List<ResolveInfo> apps =
-                packageManager.queryIntentActivities(
-                        launcherIntent,
-                        0
-                );
+                getLauncherApps();
 
-        // Exact name
+        // First: exact label match
         for (ResolveInfo info : apps) {
 
-            if (info.activityInfo == null) {
-                continue;
-            }
-
-            ApplicationInfo appInfo =
-                    info.activityInfo.applicationInfo;
-
             String label =
-                    appInfo.loadLabel(
-                            packageManager
-                    ).toString();
+                    String.valueOf(
+                            info.loadLabel(
+                                    packageManager
+                            )
+                    );
 
-            if (label.toLowerCase(Locale.ROOT)
+            if (normalize(label)
                     .equals(wanted)) {
 
-                return launch(appInfo.packageName);
+                return launch(info);
             }
         }
 
-        // Partial name
+        // Second: partial label match
         for (ResolveInfo info : apps) {
 
-            if (info.activityInfo == null) {
-                continue;
-            }
-
-            ApplicationInfo appInfo =
-                    info.activityInfo.applicationInfo;
-
             String label =
-                    appInfo.loadLabel(
-                            packageManager
-                    ).toString();
+                    String.valueOf(
+                            info.loadLabel(
+                                    packageManager
+                            )
+                    );
 
-            String lowerLabel =
-                    label.toLowerCase(Locale.ROOT);
+            String normalized =
+                    normalize(label);
 
-            if (lowerLabel.contains(wanted) ||
-                    wanted.contains(lowerLabel)) {
+            if (normalized.contains(wanted) ||
+                    wanted.contains(normalized)) {
 
-                return launch(appInfo.packageName);
+                if (normalized.length() >= 3) {
+                    return launch(info);
+                }
+            }
+        }
+
+        // Common aliases
+        String packageName =
+                findKnownPackage(wanted);
+
+        if (packageName != null) {
+
+            Intent intent =
+                    packageManager
+                            .getLaunchIntentForPackage(
+                                    packageName
+                            );
+
+            if (intent != null) {
+
+                intent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                );
+
+                context.startActivity(intent);
+
+                return true;
             }
         }
 
         return false;
     }
 
-    private boolean launch(String packageName) {
+    private boolean launch(
+            ResolveInfo info) {
+
+        Intent intent =
+                new Intent(
+                        Intent.ACTION_MAIN
+                );
+
+        intent.addCategory(
+                Intent.CATEGORY_LAUNCHER
+        );
+
+        intent.setPackage(
+                info.activityInfo.packageName
+        );
+
+        intent.setClassName(
+                info.activityInfo.packageName,
+                info.activityInfo.name
+        );
+
+        intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
+        );
 
         try {
-
-            Intent intent =
-                    packageManager.getLaunchIntentForPackage(
-                            packageName
-                    );
-
-            if (intent == null) {
-                return false;
-            }
-
-            intent.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK |
-                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-            );
 
             context.startActivity(intent);
 
@@ -116,8 +135,81 @@ public class AppLauncher {
 
         } catch (Exception e) {
 
-            e.printStackTrace();
             return false;
         }
     }
-                }
+
+    private List<ResolveInfo>
+    getLauncherApps() {
+
+        Intent intent =
+                new Intent(
+                        Intent.ACTION_MAIN
+                );
+
+        intent.addCategory(
+                Intent.CATEGORY_LAUNCHER
+        );
+
+        return packageManager
+                .queryIntentActivities(
+                        intent,
+                        PackageManager.MATCH_ALL
+                );
+    }
+
+    private String normalize(
+            String text) {
+
+        return text
+                .toLowerCase(
+                        Locale.ROOT
+                )
+                .replace(
+                        " ",
+                        ""
+                )
+                .replace(
+                        "-",
+                        ""
+                )
+                .replace(
+                        "_",
+                        ""
+                );
+    }
+
+    private String findKnownPackage(
+            String name) {
+
+        if (name.contains("whatsapp")) {
+            return "com.whatsapp";
+        }
+
+        if (name.contains("instagram")) {
+            return "com.instagram.android";
+        }
+
+        if (name.contains("telegram")) {
+            return "org.telegram.messenger";
+        }
+
+        if (name.contains("snapchat")) {
+            return "com.snapchat.android";
+        }
+
+        if (name.contains("chrome")) {
+            return "com.android.chrome";
+        }
+
+        if (name.contains("gmail")) {
+            return "com.google.android.gm";
+        }
+
+        if (name.contains("youtube")) {
+            return "com.google.android.youtube";
+        }
+
+        return null;
+    }
+}
