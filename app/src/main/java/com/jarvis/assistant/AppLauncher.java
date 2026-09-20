@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -21,8 +20,7 @@ public class AppLauncher {
                 context.getPackageManager();
     }
 
-    public boolean openApp(
-            String appName) {
+    public boolean openApp(String appName) {
 
         if (appName == null ||
                 appName.trim().isEmpty()) {
@@ -36,7 +34,7 @@ public class AppLauncher {
         List<ResolveInfo> apps =
                 getLauncherApps();
 
-        // First: exact label match
+        // Exact app-name match
         for (ResolveInfo info : apps) {
 
             String label =
@@ -46,14 +44,13 @@ public class AppLauncher {
                             )
                     );
 
-            if (normalize(label)
-                    .equals(wanted)) {
+            if (normalize(label).equals(wanted)) {
 
                 return launch(info);
             }
         }
 
-        // Second: partial label match
+        // Partial app-name match
         for (ResolveInfo info : apps) {
 
             String label =
@@ -70,12 +67,13 @@ public class AppLauncher {
                     wanted.contains(normalized)) {
 
                 if (normalized.length() >= 3) {
+
                     return launch(info);
                 }
             }
         }
 
-        // Common aliases
+        // Known app aliases
         String packageName =
                 findKnownPackage(wanted);
 
@@ -93,9 +91,14 @@ public class AppLauncher {
                         Intent.FLAG_ACTIVITY_NEW_TASK
                 );
 
-                context.startActivity(intent);
+                try {
 
-                return true;
+                    context.startActivity(intent);
+
+                    return true;
+
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -112,10 +115,6 @@ public class AppLauncher {
 
         intent.addCategory(
                 Intent.CATEGORY_LAUNCHER
-        );
-
-        intent.setPackage(
-                info.activityInfo.packageName
         );
 
         intent.setClassName(
@@ -151,32 +150,20 @@ public class AppLauncher {
                 Intent.CATEGORY_LAUNCHER
         );
 
-        return packageManager
-                .queryIntentActivities(
-                        intent,
-                        PackageManager.MATCH_ALL
-                );
+        return packageManager.queryIntentActivities(
+                intent,
+                PackageManager.MATCH_ALL
+        );
     }
 
     private String normalize(
             String text) {
 
         return text
-                .toLowerCase(
-                        Locale.ROOT
-                )
-                .replace(
-                        " ",
-                        ""
-                )
-                .replace(
-                        "-",
-                        ""
-                )
-                .replace(
-                        "_",
-                        ""
-                );
+                .toLowerCase(Locale.ROOT)
+                .replace(" ", "")
+                .replace("-", "")
+                .replace("_", "");
     }
 
     private String findKnownPackage(
