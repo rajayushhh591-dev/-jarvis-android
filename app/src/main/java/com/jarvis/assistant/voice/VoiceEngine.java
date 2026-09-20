@@ -14,16 +14,23 @@ import java.util.ArrayList;
 public class VoiceEngine {
 
     public interface Listener {
+
         void onListening();
+
         void onResult(String text);
+
         void onError(String error);
     }
 
     private final Listener listener;
+
     private final Handler handler =
-            new Handler(Looper.getMainLooper());
+            new Handler(
+                    Looper.getMainLooper()
+            );
 
     private SpeechRecognizer recognizer;
+
     private Intent recognizerIntent;
 
     private boolean active = false;
@@ -35,23 +42,33 @@ public class VoiceEngine {
         this.listener = listener;
 
         recognizer =
-                SpeechRecognizer.createSpeechRecognizer(
-                        context
-                );
+                SpeechRecognizer
+                        .createSpeechRecognizer(
+                                context
+                        );
 
         recognizerIntent =
                 new Intent(
-                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                        RecognizerIntent
+                                .ACTION_RECOGNIZE_SPEECH
                 );
 
         recognizerIntent.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                RecognizerIntent
+                        .EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent
+                        .LANGUAGE_MODEL_FREE_FORM
         );
 
         // Indian English / Hinglish
         recognizerIntent.putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE,
+                "en-IN"
+        );
+
+        recognizerIntent.putExtra(
+                RecognizerIntent
+                        .EXTRA_LANGUAGE_PREFERENCE,
                 "en-IN"
         );
 
@@ -68,83 +85,92 @@ public class VoiceEngine {
         recognizer.setRecognitionListener(
                 new RecognitionListener() {
 
-            @Override
-            public void onReadyForSpeech(
-                    Bundle params) {
+                    @Override
+                    public void onReadyForSpeech(
+                            Bundle params) {
 
-                if (active) {
-                    listener.onListening();
-                }
-            }
+                        if (active) {
+                            listener.onListening();
+                        }
+                    }
 
-            @Override
-            public void onResults(
-                    Bundle results) {
+                    @Override
+                    public void onResults(
+                            Bundle results) {
 
-                if (!active) return;
+                        if (!active) {
+                            return;
+                        }
 
-                ArrayList<String> matches =
-                        results.getStringArrayList(
-                                SpeechRecognizer
-                                        .RESULTS_RECOGNITION
+                        ArrayList<String> matches =
+                                results.getStringArrayList(
+                                        SpeechRecognizer
+                                                .RESULTS_RECOGNITION
+                                );
+
+                        if (matches != null &&
+                                !matches.isEmpty()) {
+
+                            String text =
+                                    matches.get(0)
+                                            .trim();
+
+                            if (!text.isEmpty()) {
+
+                                listener.onResult(
+                                        text
+                                );
+
+                            } else {
+
+                                restart();
+                            }
+
+                        } else {
+
+                            restart();
+                        }
+                    }
+
+                    @Override
+                    public void onError(
+                            int error) {
+
+                        if (!active) {
+                            return;
+                        }
+
+                        listener.onError(
+                                String.valueOf(error)
                         );
-
-                if (matches != null &&
-                        !matches.isEmpty()) {
-
-                    String text =
-                            matches.get(0).trim();
-
-                    if (!text.isEmpty()) {
-
-                        listener.onResult(text);
-
-                    } else {
 
                         restart();
                     }
 
-                } else {
+                    @Override
+                    public void onBeginningOfSpeech() {}
 
-                    restart();
+                    @Override
+                    public void onRmsChanged(
+                            float rmsdB) {}
+
+                    @Override
+                    public void onBufferReceived(
+                            byte[] buffer) {}
+
+                    @Override
+                    public void onEndOfSpeech() {}
+
+                    @Override
+                    public void onPartialResults(
+                            Bundle partialResults) {}
+
+                    @Override
+                    public void onEvent(
+                            int eventType,
+                            Bundle params) {}
                 }
-            }
-
-            @Override
-            public void onError(int error) {
-
-                if (!active) return;
-
-                listener.onError(
-                        String.valueOf(error)
-                );
-
-                restart();
-            }
-
-            @Override
-            public void onBeginningOfSpeech() {}
-
-            @Override
-            public void onRmsChanged(
-                    float rmsdB) {}
-
-            @Override
-            public void onBufferReceived(
-                    byte[] buffer) {}
-
-            @Override
-            public void onEndOfSpeech() {}
-
-            @Override
-            public void onPartialResults(
-                    Bundle partialResults) {}
-
-            @Override
-            public void onEvent(
-                    int eventType,
-                    Bundle params) {}
-        });
+        );
     }
 
     public void start() {
@@ -164,7 +190,9 @@ public class VoiceEngine {
             } catch (Exception e) {
 
                 listener.onError(
-                        e.getMessage()
+                        String.valueOf(
+                                e.getMessage()
+                        )
                 );
             }
         });
@@ -172,23 +200,29 @@ public class VoiceEngine {
 
     public void restart() {
 
-        if (!active) return;
+        if (!active) {
+            return;
+        }
 
-        handler.postDelayed(() -> {
+        handler.postDelayed(
+                () -> {
 
-            if (!active) return;
+                    if (!active) {
+                        return;
+                    }
 
-            try {
+                    try {
 
-                recognizer.cancel();
+                        recognizer.cancel();
 
-                recognizer.startListening(
-                        recognizerIntent
-                );
+                        recognizer.startListening(
+                                recognizerIntent
+                        );
 
-            } catch (Exception ignored) {}
-
-        }, 700);
+                    } catch (Exception ignored) {}
+                },
+                700
+        );
     }
 
     public void stop() {
@@ -202,6 +236,7 @@ public class VoiceEngine {
         try {
 
             recognizer.stopListening();
+
             recognizer.cancel();
 
         } catch (Exception ignored) {}
