@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams faceParams =
                 new LinearLayout.LayoutParams(
-                        0,
+                       -1,
                         0,
                         1f
                 );
